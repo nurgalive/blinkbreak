@@ -1,0 +1,34 @@
+# clangd project configuration for BlinkBreak
+
+CompileFlags:
+  # 1. Point clangd to your build directory where compile_commands.json lives
+  # CompilationDatabase: build/
+  CompilationDatabase: build/ninja-debug/
+
+  # 2. Add flags that might be missing or useful globally (applies even with compile_commands.json)
+  Add:
+    - "-std=c++23"
+    - "-DNOMINMAX" # Essential for Windows to avoid min/max macro conflicts
+    - "-D_CRT_SECURE_NO_WARNINGS"
+    - "-Wall"
+    - "-Wextra"
+    # MSVC compatibility mode (crucial if using clangd with MSVC headers)
+    - "--driver-mode=cl"
+
+Diagnostics:
+  # Suppress common noisy warnings in Windows/MSVC environments
+  Suppress:
+    - "missing-field-initializers"
+    - "unused-parameter"
+
+Index:
+  Background: Build
+
+InlayHints:
+  Designators: true
+  Enabled: true
+  ParameterNames: true
+  DeducedTypes: true
+
+Hover:
+  ShowAKA: true

@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
     }
 
     spdlog::info("Configuration validated successfully");
-    spdlog::info("Stage 3: Configuration system complete");
+    spdlog::info("Stage 4: Complete");
 
     return 0;
 }

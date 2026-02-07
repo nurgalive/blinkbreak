@@ -4,6 +4,8 @@ if(NOT TARGET blinkbreak_tests)
         unit/test_timer.cpp
         unit/test_state_machine.cpp
         unit/test_config_manager.cpp
+        unit/test_message_provider.cpp
+        unit/test_break_scheduler.cpp
     )
 
     target_link_libraries(blinkbreak_tests

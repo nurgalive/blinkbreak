@@ -10,6 +10,10 @@ if(NOT TARGET blinkbreak_core)
             core/config_manager.cpp
             core/config_manager.hpp
             core/config_types.hpp
+            core/message_provider.cpp
+            core/message_provider.hpp
+            core/break_scheduler.cpp
+            core/break_scheduler.hpp
     )
     target_include_directories(blinkbreak_core
         PUBLIC

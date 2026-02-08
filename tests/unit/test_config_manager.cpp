@@ -234,7 +234,8 @@ TEST_F(ConfigManagerTest, LoadSaveRoundtrip) {
     original.short_break.interval = 999s;
     auto path = test_dir_ / "roundtrip.json";
 
-    config_manager_->Save(original, path);
+    auto save_result = config_manager_->Save(original, path);
+    EXPECT_TRUE(save_result);
     auto loaded = config_manager_->Load(path);
 
     ASSERT_TRUE(loaded.has_value());

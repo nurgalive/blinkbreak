@@ -1,0 +1,28 @@
+// Minimal TimerDisplay component for BlinkBreak.
+//
+// Replaced the more complex approximation with a compact, well-formed component
+// to avoid Slint parsing/syntax issues while keeping the visual timer.
+export component TimerDisplay inherits Rectangle {
+    in property <string> time: "00:00";
+    in property <float> progress: 0.0; // kept for future use
+
+    // Default size; parent can override
+    width: 160px;
+    height: 160px;
+    border-radius: self.width / 2;
+    background: #ffffff;
+    border-width: 2px;
+    border-color: #e0e0e0;
+
+    // Centered time text
+    Text {
+        text: root.time;
+        font-size: 28px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: #212121;
+        width: parent.width;
+        height: parent.height;
+    }
+}

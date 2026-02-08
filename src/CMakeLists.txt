@@ -61,6 +61,7 @@ if(NOT TARGET blinkbreak_ui)
     )
     slint_target_sources(blinkbreak_ui
         ${PROJECT_SOURCE_DIR}/ui/main_window.slint
+        ${PROJECT_SOURCE_DIR}/ui/components/timer_display.slint
     )
 endif()
 

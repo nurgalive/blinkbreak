@@ -41,7 +41,7 @@ Presets use the Visual Studio 17 2022 generator (multi-config).
 
 ```bash
 # Configure (Debug)
-cmake --preset=debug
+cmake --preset=debug --fresh
 
 # Configure with Rust (with explicit paths)
 $toolchain = "$env:USERPROFILE\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin"

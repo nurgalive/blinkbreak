@@ -67,8 +67,8 @@ TEST_F(MessageProviderTest, GetNextRotatesThroughMessages) {
 /// @test Reset returns to first message.
 TEST_F(MessageProviderTest, ResetReturnsToFirst) {
     MessageProvider provider(test_messages_, true, false);
-    provider.GetNext();
-    provider.GetNext();
+    (void)provider.GetNext();
+    (void)provider.GetNext();
     provider.Reset();
     EXPECT_EQ(provider.GetNext(), "Message 1");
 }
@@ -105,7 +105,7 @@ TEST_F(MessageProviderTest, SetMessagesUpdatesMessages) {
 /// @test SetRotate changes rotation behavior.
 TEST_F(MessageProviderTest, SetRotateChangesRotation) {
     MessageProvider provider(test_messages_, false);
-    provider.GetNext();
+    (void)provider.GetNext();
     provider.SetRotate(true);
 
     EXPECT_EQ(provider.GetNext(), "Message 1");
@@ -119,7 +119,7 @@ TEST_F(MessageProviderTest, SetRotateChangesRotation) {
 /// @test Move constructor works correctly.
 TEST_F(MessageProviderTest, MoveConstructorWorks) {
     MessageProvider provider(test_messages_, true, false);
-    provider.GetNext();  // Advance to Message 2
+    (void)provider.GetNext();  // Advance to Message 2
 
     MessageProvider moved(std::move(provider));
     EXPECT_EQ(moved.GetNext(), "Message 2");

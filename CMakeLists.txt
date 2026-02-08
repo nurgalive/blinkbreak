@@ -18,6 +18,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(BLINKBREAK_BUILD_TESTS "Build unit tests" ON)
 option(BLINKBREAK_BUILD_DOCS "Build documentation" OFF)
 
+
+
 # Include FetchContent for dependencies
 include(FetchContent)
 
@@ -29,7 +31,7 @@ if(BLINKBREAK_BUILD_TESTS)
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG v1.14.0
+        GIT_TAG v1.17.0
     )
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
@@ -64,10 +66,21 @@ endif()
 FetchContent_Declare(
     spdlog
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG v1.12.0
+    GIT_TAG v1.17.0
 )
 FetchContent_MakeAvailable(spdlog)
 target_compile_definitions(spdlog PRIVATE _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
+
+# Fetch Slint
+set(SLINT_FEATURE_INTERPRETER OFF CACHE BOOL "" FORCE)
+set(ENV{RUSTFLAGS} "$ENV{RUSTFLAGS} -Awarnings")
+FetchContent_Declare(
+    slint
+    GIT_REPOSITORY https://github.com/slint-ui/slint.git
+    GIT_TAG v1.15.0
+    SOURCE_SUBDIR api/cpp
+)
+FetchContent_MakeAvailable(slint)
 
 # Add subdirectories
 add_subdirectory(src)

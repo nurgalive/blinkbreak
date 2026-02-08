@@ -83,6 +83,7 @@ public:
 private:
     Duration total_duration_;       ///< The total countdown duration.
     Duration remaining_;            ///< The remaining time.
+    DurationMs remainder_ms_;       ///< Accumulated sub-second time.
     std::atomic<bool> is_running_;  ///< Whether the timer is currently running.
     ExpiredCallback on_expired_;    ///< Callback for timer expiration.
     TickCallback on_tick_;          ///< Callback for timer ticks.

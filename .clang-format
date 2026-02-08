@@ -1,7 +1,7 @@
 # Google C++ Style Guide based configuration
 Language: Cpp
 BasedOnStyle: Google
-Standard: c++20
+Standard: c++23
 
 # Indentation
 IndentWidth: 4

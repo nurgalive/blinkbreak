@@ -4,10 +4,12 @@ CompileFlags:
   # 1. Point clangd to your build directory where compile_commands.json lives
   # CompilationDatabase: build/
   CompilationDatabase: build/ninja-debug/
+  Compiler: clang-cl
 
   # 2. Add flags that might be missing or useful globally (applies even with compile_commands.json)
   Add:
     - "-std=c++23"
+    - "-Wno-c++98-compat"
     - "-DNOMINMAX" # Essential for Windows to avoid min/max macro conflicts
     - "-D_CRT_SECURE_NO_WARNINGS"
     - "-Wall"

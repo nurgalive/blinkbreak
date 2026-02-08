@@ -10,6 +10,7 @@ namespace blinkbreak {
 Timer::Timer(Duration duration)
     : total_duration_(duration),
       remaining_(duration),
+      remainder_ms_(DurationMs::zero()),
       is_running_(false),
       on_expired_(nullptr),
       on_tick_(nullptr) {
@@ -21,6 +22,7 @@ Timer::~Timer() = default;
 Timer::Timer(Timer&& other) noexcept
     : total_duration_(other.total_duration_),
       remaining_(other.remaining_),
+      remainder_ms_(other.remainder_ms_),
       is_running_(other.is_running_.load()),
       on_expired_(std::move(other.on_expired_)),
       on_tick_(std::move(other.on_tick_)) {}
@@ -29,6 +31,7 @@ Timer& Timer::operator=(Timer&& other) noexcept {
     if (this != &other) {
         total_duration_ = other.total_duration_;
         remaining_ = other.remaining_;
+        remainder_ms_ = other.remainder_ms_;
         is_running_.store(other.is_running_.load());
         on_expired_ = std::move(other.on_expired_);
         on_tick_ = std::move(other.on_tick_);
@@ -48,6 +51,7 @@ void Timer::Pause() {
 
 void Timer::Reset() {
     remaining_ = total_duration_;
+    remainder_ms_ = DurationMs::zero();
     is_running_.store(false);
     spdlog::debug("Timer reset to {}s", total_duration_.count());
 }
@@ -77,9 +81,16 @@ void Timer::Update(DurationMs delta_time) {
         return;
     }
 
-    auto delta_seconds = std::chrono::duration_cast<Duration>(delta_time);
+    remainder_ms_ += delta_time;
+    auto delta_seconds = std::chrono::duration_cast<Duration>(remainder_ms_);
+    if (delta_seconds.count() == 0) {
+        return;
+    }
+    remainder_ms_ -= std::chrono::duration_cast<DurationMs>(delta_seconds);
+
     if (delta_seconds >= remaining_) {
         remaining_ = Duration::zero();
+        remainder_ms_ = DurationMs::zero();
         is_running_.store(false);
         spdlog::debug("Timer expired");
         if (on_expired_) {

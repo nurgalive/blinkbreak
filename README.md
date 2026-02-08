@@ -29,6 +29,11 @@ A lightweight, cross-platform eye strain prevention application.
 
 - CMake 3.25 or later
 - Visual Studio 2022 (MSVC with C++23 support)
+- Rust 19.0 or later (optional, for Slint UI integration)
+- Slint 1.15 or later (optional, for UI development)
+- Clang-Format 15 or later (optional, for code formatting)
+- Gtest 1.17 or later (for unit testing)
+- Spdlog 1.17 or later (for logging)
 
 ### Build Commands
 
@@ -37,15 +42,6 @@ Presets use the Visual Studio 17 2022 generator (multi-config).
 ```bash
 # Configure (Debug)
 cmake --preset=debug
-
-# Configure clean
-cmake --preset=debug --fresh
-
-# Configure with Rust
-cmake --preset=debug -DBLINKBREAK_ENABLE_SLINT=ON
-
-# Build
-cmake --build --preset=debug
 
 # Configure with Rust (with explicit paths)
 $toolchain = "$env:USERPROFILE\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin"
@@ -56,6 +52,8 @@ cmake --preset=debug --fresh `
 # Configure with Rust (with explicit paths, only compiler)
 cmake --preset=debug --fresh -DRust_COMPILER="C:\Users\azn\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe"
 
+# Build
+cmake --build --preset=debug
 
 # Run tests
 ctest --preset=debug

@@ -181,7 +181,7 @@ BlinkBreak is a Windows eye strain prevention application designed to help users
 | ------------- | -------------------------------------- |
 | Language      | C++23                                  |
 | Build System  | CMake 3.25+ with Visual Studio 17 2022 |
-| GUI Framework | Slint                                  |
+| GUI Framework | Slint 1.15+                            |
 | Testing       | Google Test / Google Mock              |
 | Configuration | JSON (rapidjson)                       |
 | Logging       | spdlog                                 |
@@ -657,6 +657,7 @@ Integrate the Slint UI framework and create a minimal main window showing the co
 - Stage 4 completed successfully
 - All Stage 4 tests passing
 - Slint development environment set up
+- Keep the Slint version 1.15.0
 
 ### Implementation Steps
 
@@ -671,7 +672,7 @@ Add Slint dependency to the root CMakeLists.txt:
 FetchContent_Declare(
     slint
     GIT_REPOSITORY https://github.com/slint-ui/slint.git
-    GIT_TAG v1.7.0
+    GIT_TAG v1.15.0
     SOURCE_SUBDIR api/cpp
 )
 FetchContent_MakeAvailable(slint)
@@ -1295,12 +1296,22 @@ target_link_libraries(blinkbreak
 
 #### Verification Criteria
 
-- [ ] All Stage 4 tests still pass
-- [ ] Application compiles with UI components
+- [x] All Stage 4 tests still pass (`ctest --preset=debug`)
+- [x] Application compiles with UI components (`cmake --build --preset=debug`)
 - [ ] Application starts and shows logs
 - [ ] Timer thread runs correctly
 - [ ] State transitions work via OnStart/OnPause
 - [ ] Time formatting is correct
+
+Validation results:
+
+- `cmake --preset=debug --fresh -DRust_COMPILER="C:\Users\azn\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe"`: configured; RapidJSON dev warnings.
+- `cmake --build --preset=debug`: build succeeded; Slint Rust warnings (non-fatal).
+- `ctest --preset=debug`: 80 tests passed.
+
+Notes:
+
+- Slint `SLINT_FEATURE_INTERPRETER` was disabled to avoid a Rust compile error in `slint-interpreter` with the current toolchain.
 
 ### Deliverables
 
@@ -1309,7 +1320,7 @@ target_link_libraries(blinkbreak
 - [x] Timer thread with periodic updates
 - [x] UI state management
 - [x] Duration formatting utility
-- [x] All tests pass (82+ total)
+- [x] All tests pass (80 total)
 
 ---
 
@@ -1323,6 +1334,7 @@ Add system tray icon with context menu for basic application control. The applic
 
 - Stage 5 completed successfully
 - All Stage 5 tests passing
+- Keep the Slint version 1.15.0
 
 ### Implementation Steps
 

@@ -38,8 +38,24 @@ Presets use the Visual Studio 17 2022 generator (multi-config).
 # Configure (Debug)
 cmake --preset=debug
 
+# Configure clean
+cmake --preset=debug --fresh
+
+# Configure with Rust
+cmake --preset=debug -DBLINKBREAK_ENABLE_SLINT=ON
+
 # Build
 cmake --build --preset=debug
+
+# Configure with Rust (with explicit paths)
+$toolchain = "$env:USERPROFILE\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin"
+cmake --preset=debug --fresh `
+  -DRust_COMPILER="$toolchain\rustc.exe" `
+  -DRust_CARGO="$toolchain\cargo.exe"
+
+# Configure with Rust (with explicit paths, only compiler)
+cmake --preset=debug --fresh -DRust_COMPILER="C:\Users\azn\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe"
+
 
 # Run tests
 ctest --preset=debug

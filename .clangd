@@ -1,36 +1,90 @@
-# clangd project configuration for BlinkBreak
+# clangd project configuration for BlinkBreak with MSVC C++23
 
 CompileFlags:
-  # 1. Point clangd to your build directory where compile_commands.json lives
-  # CompilationDatabase: build/
-  CompilationDatabase: build/ninja-debug/
+  # Compiler configuration for MSVC environment
   Compiler: clang-cl
 
-  # 2. Add flags that might be missing or useful globally (applies even with compile_commands.json)
+  # Add essential C++23 and MSVC flags
   Add:
+    # C++23 standard
     - "-std=c++23"
-    - "-Wno-c++98-compat"
-    - "-DNOMINMAX" # Essential for Windows to avoid min/max macro conflicts
+    - "/std:c++latest"
+
+    # MSVC compatibility
+    - "--driver-mode=cl"
+    - "-fms-extensions"
+    - "-fms-compatibility"
+    - "-fdelayed-template-parsing"
+
+    # Windows macros
+    - "-DNOMINMAX"
+    - "-DWIN32_LEAN_AND_MEAN"
     - "-D_CRT_SECURE_NO_WARNINGS"
+    - "-DUNICODE"
+    - "-D_UNICODE"
+
+    # Enable proper C++23 library features
+    - "-D_HAS_CXX23=1"
+    - "-D__cpp_lib_expected=202211L"
+
+    # Include paths (adjust MSVC version as needed)
+    - "-IC:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/include"
+    - "-IC:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Auxiliary/VS/include"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um"
+    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/winrt"
+
+    # Project include paths
+    - "-Iinclude"
+    - "-Isrc"
+    - "-Ibuild/debug/_deps/rapidjson-src/include"
+    - "-Ibuild/debug/_deps/spdlog-src/include"
+    - "-Ibuild/debug/_deps/googletest-src/googletest/include"
+    - "-Ibuild/debug/_deps/googletest-src/googlemock/include"
+
+    # Warnings
     - "-Wall"
     - "-Wextra"
-    # MSVC compatibility mode (crucial if using clangd with MSVC headers)
-    - "--driver-mode=cl"
+    - "-Wno-c++98-compat"
+    - "-Wno-c++98-compat-pedantic"
+    - "-Wno-missing-field-initializers"
+
+  # Remove flags that might conflict
+  Remove:
+    - "-march=*"
+    - "-mtune=*"
 
 Diagnostics:
-  # Suppress common noisy warnings in Windows/MSVC environments
+  # Suppress noisy warnings
   Suppress:
     - "missing-field-initializers"
     - "unused-parameter"
+    - "unused-variable"
+
+  # Tune clang-tidy checks
+  ClangTidy:
+    Add:
+      - "modernize-*"
+      - "readability-*"
+      - "performance-*"
+    Remove:
+      - "modernize-use-trailing-return-type"
+      - "readability-identifier-length"
+      - "readability-magic-numbers"
 
 Index:
   Background: Build
+  StandardLibrary: Yes
 
 InlayHints:
-  Designators: true
   Enabled: true
   ParameterNames: true
   DeducedTypes: true
+  Designators: true
 
 Hover:
   ShowAKA: true
+
+Completion:
+  AllScopes: true

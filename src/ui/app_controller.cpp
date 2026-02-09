@@ -4,6 +4,7 @@
 #include "app_controller.hpp"
 
 #include "main_window.h"
+#include "tray_manager.hpp"
 
 #include <slint.h>
 #include <spdlog/spdlog.h>
@@ -81,9 +82,12 @@ bool AppController::Initialize() {
 
     if (config_.notification.enabled) {
         scheduler_->SetOnWarning(
-            [](BreakType type, Duration time_until) {
+            [this](BreakType type, Duration time_until) {
                 spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
                              time_until.count());
+                if (tray_manager_) {
+                    tray_manager_->UpdateStatus(is_running_, time_until, type);
+                }
             },
             config_.notification.warning_time);
     }
@@ -101,6 +105,15 @@ bool AppController::Initialize() {
     ui->on_pause_clicked([this] { OnPause(); });
     ui->on_skip_clicked([this] { OnSkip(); });
     ui->on_settings_clicked([this] { OnOpenSettings(); });
+    
+    // Handle window close - minimize to tray instead of quitting
+    ui->window().on_close_requested([this]() {
+        spdlog::debug("Window close requested - minimizing to tray");
+        if (main_window_) {
+            (*main_window_)->window().set_minimized(true);
+        }
+        return slint::CloseRequestResponse::KeepWindowShown;
+    });
 
     ui->set_time_remaining(slint::SharedString(time_remaining_));
     ui->set_status_text(slint::SharedString(status_text_));
@@ -108,6 +121,42 @@ bool AppController::Initialize() {
     ui->set_is_running(is_running_);
     ui->set_next_break_type(
         slint::SharedString(BreakTypeToString(scheduler_->GetNextBreakType())));
+
+    // Initialize tray manager
+    TrayManager::Callbacks tray_callbacks{
+        .on_show_window = [this]() {
+            spdlog::debug("Tray: Show window");
+            if (main_window_) {
+                (*main_window_)->window().set_minimized(false);
+                (*main_window_)->show();
+            }
+        },
+        .on_start_pause = [this]() {
+            spdlog::debug("Tray: Start/Pause");
+            if (state_machine_->GetCurrentState() == State::kRunning) {
+                OnPause();
+            } else {
+                OnStart();
+            }
+        },
+        .on_skip = [this]() {
+            spdlog::debug("Tray: Skip");
+            OnSkip();
+        },
+        .on_settings = [this]() {
+            spdlog::debug("Tray: Settings");
+            OnOpenSettings();
+        },
+        .on_quit = [this]() {
+            spdlog::debug("Tray: Quit");
+            OnQuit();
+        }
+    };
+
+    tray_manager_ = std::make_unique<TrayManager>(std::move(tray_callbacks));
+    tray_manager_->Show();
+    tray_manager_->UpdateStatus(is_running_, config_.short_break.interval,
+                                scheduler_->GetNextBreakType());
 
     spdlog::info("AppController initialized successfully");
     return true;
@@ -127,9 +176,13 @@ int AppController::Run() {
 
     spdlog::info("Application running...");
 
+    // Show the main window
     if (main_window_) {
-        (*main_window_)->run();
+        (*main_window_)->show();
     }
+
+    // Run the event loop (keep running even if no windows are visible)
+    slint::run_event_loop();
 
     running_.store(false);
     if (timer_thread_.joinable()) {
@@ -149,6 +202,9 @@ void AppController::OnStart() {
             scheduler_->Resume();
             std::lock_guard lock(mutex_);
             status_text_ = "Running";
+            if (tray_manager_) {
+                tray_manager_->UpdateMenu(true);
+            }
         }
         return;
     }
@@ -158,6 +214,9 @@ void AppController::OnStart() {
         scheduler_->Start();
         std::lock_guard lock(mutex_);
         status_text_ = "Running";
+        if (tray_manager_) {
+            tray_manager_->UpdateMenu(true);
+        }
     }
 }
 
@@ -169,6 +228,9 @@ void AppController::OnPause() {
         scheduler_->Pause();
         std::lock_guard lock(mutex_);
         status_text_ = "Paused";
+        if (tray_manager_) {
+            tray_manager_->UpdateMenu(false);
+        }
     }
 }
 
@@ -224,6 +286,24 @@ void AppController::OnOpenSettings() {
     }
 
     (*settings_dialog_)->show();
+}
+
+void AppController::OnQuit() {
+    spdlog::info("Quit requested");
+    
+    running_.store(false);
+    
+    if (main_window_) {
+        slint::invoke_from_event_loop([ui = *main_window_]() mutable {
+            ui->hide();
+        });
+    }
+    
+    if (tray_manager_) {
+        tray_manager_->Hide();
+    }
+    
+    slint::quit_event_loop();
 }
 
 std::string AppController::GetTimeRemainingString() const {
@@ -291,6 +371,12 @@ void AppController::UpdateUI() {
         progress = progress_;
         is_running = is_running_;
         next_break_type = BreakTypeToString(scheduler_->GetNextBreakType());
+        
+        // Update tray status
+        if (tray_manager_ && time_until) {
+            tray_manager_->UpdateStatus(is_running_, *time_until, 
+                                       scheduler_->GetNextBreakType());
+        }
     }
 
     if (!main_window_) {

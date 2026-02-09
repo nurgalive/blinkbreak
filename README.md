@@ -13,6 +13,10 @@ A lightweight, cross-platform eye strain prevention application.
 
 ## Progress
 
+- Stage 1 (Project Foundation): complete
+  - Build system with CMake and Visual Studio 2022
+  - Basic `Timer` class with full test coverage
+  - Code formatting with clang-format
 - Stage 2 (State Machine Implementation): complete
   - Events and `StateMachine` implemented
   - Unit tests added for transitions, callbacks, and workflows
@@ -22,6 +26,24 @@ A lightweight, cross-platform eye strain prevention application.
   - Default config JSON added under `resources/config`
   - Unit tests added for parsing, validation, and file IO
   - `main.cpp` demonstrates config load/validate flow
+- Stage 4 (Message Provider and Break Scheduler): complete
+  - `MessageProvider` with sequential and random rotation
+  - `BreakScheduler` for coordinating short and long breaks
+  - Full unit test coverage (25+ new tests)
+  - 80 tests total passing
+- Stage 5 (Basic Slint UI): complete
+  - Slint UI framework integration
+  - Main window with timer display and controls
+  - `AppController` orchestrating UI and core logic
+  - Timer thread with periodic updates
+- Stage 6 (System Tray Integration): complete
+  - Platform abstraction layer for cross-platform support
+  - Windows tray icon implementation with Win32 API
+  - `TrayManager` with context menu (Show, Start/Pause, Skip, Settings, Quit)
+  - Tooltip status updates showing time until break
+  - Full integration with `AppController`
+  - Bug fix #1: Menu now updates correctly when resuming from paused state
+  - Bug fix #2: Window minimizes to tray on close instead of quitting app
 
 ## Building
 

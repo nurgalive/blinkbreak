@@ -7,6 +7,7 @@
 #include "core/break_scheduler.hpp"
 #include "core/config_manager.hpp"
 #include "core/state_machine.hpp"
+#include "tray_manager.hpp"
 
 #include <atomic>
 #include <memory>
@@ -70,6 +71,9 @@ public:
     /// @brief Opens the settings dialog.
     void OnOpenSettings();
 
+    /// @brief Handles quit action from tray menu.
+    void OnQuit();
+
     /// @brief Gets formatted time remaining string.
     /// @return Time in "MM:SS" format.
     [[nodiscard]] std::string GetTimeRemainingString() const;
@@ -97,6 +101,7 @@ private:
     std::unique_ptr<ConfigManager> config_manager_;
     std::unique_ptr<StateMachine> state_machine_;
     std::unique_ptr<BreakScheduler> scheduler_;
+    std::unique_ptr<TrayManager> tray_manager_;
     AppConfig config_;
 
     std::unique_ptr<slint::ComponentHandle<MainWindow>> main_window_;

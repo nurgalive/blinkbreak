@@ -1,3 +1,6 @@
+# Platform library
+add_subdirectory(platform)
+
 # Core library
 if(NOT TARGET blinkbreak_core)
     add_library(blinkbreak_core STATIC)
@@ -39,6 +42,8 @@ if(NOT TARGET blinkbreak_ui)
         PRIVATE
             ui/app_controller.cpp
             ui/app_controller.hpp
+            ui/tray_manager.cpp
+            ui/tray_manager.hpp
     )
     target_include_directories(blinkbreak_ui
         PUBLIC
@@ -49,6 +54,7 @@ if(NOT TARGET blinkbreak_ui)
     target_link_libraries(blinkbreak_ui
         PUBLIC
             blinkbreak_core
+            blinkbreak_platform
             Slint::Slint
     )
     target_compile_definitions(blinkbreak_ui

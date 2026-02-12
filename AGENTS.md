@@ -771,6 +771,23 @@ Create `src/platform/platform_interface.hpp`:
 
 Source listing removed. See `src/platform/platform_interface.hpp`.
 
+##### 6.1 Notes (Update)
+
+- Close-to-tray behavior now hides the main window instead of minimizing it.
+- The Slint event loop is configured to keep running when all windows are hidden so the app continues in the tray until an explicit quit.
+
+##### 6.1 Unstaged Changes (Working Tree)
+
+- `README.md`: Added a generated table of contents block and expanded test commands (verbose runs and output capture).
+- `resources/config/default_config.json`: No content changes detected; pending line-ending normalization in working tree.
+- `src/core/break_scheduler.hpp`: Added `GetTimeUntilShortBreak` and `GetTimeUntilLongBreak` accessors.
+- `src/core/break_scheduler.cpp`: Added configuration logging; preserved long-break timer progress when short breaks complete; reworked `UpdateConfig` to reset timers safely and preserve running state; added detailed trigger logging with remaining times.
+- `tests/unit/test_break_scheduler.cpp`: Added tests for long timer persistence across short breaks and long-break triggering with periodic short breaks.
+- `src/ui/app_controller.hpp`: Added configuration path member, scheduler mutex, and richer UI state getters for short/long timers, progress, break counts, and skip state.
+- `src/ui/app_controller.cpp`: Implemented settings dialog persistence/validation, separate short/long progress tracking, synchronized scheduler access, skip tracking, close-to-tray hide behavior, and set event loop to run until explicit quit.
+- `ui/main_window.slint`: Reworked properties for short/long timers and progress; added break counts, dual progress bars, and skip enablement via `can-skip`; moved settings dialog import.
+- `ui/components/timer_display.slint`: Updated to show short/long break counts and made the component non-exported.
+
 #### 6.2 Create Windows Tray Icon Implementation
 
 Create `src/platform/windows/tray_icon_win.hpp`:

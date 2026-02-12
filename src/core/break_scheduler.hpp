@@ -95,6 +95,14 @@ public:
     /// @return Time until next break, or nullopt if not running.
     [[nodiscard]] std::optional<Duration> GetTimeUntilNextBreak() const;
 
+    /// @brief Gets the time until the next short break.
+    /// @return Time until the next short break, or nullopt if not running.
+    [[nodiscard]] std::optional<Duration> GetTimeUntilShortBreak() const;
+
+    /// @brief Gets the time until the next long break.
+    /// @return Time until the next long break, or nullopt if not running.
+    [[nodiscard]] std::optional<Duration> GetTimeUntilLongBreak() const;
+
     /// @brief Gets the type of the next break.
     /// @return The type of the next scheduled break.
     [[nodiscard]] BreakType GetNextBreakType() const;

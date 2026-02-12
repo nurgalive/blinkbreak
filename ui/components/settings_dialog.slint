@@ -1,0 +1,136 @@
+// Settings dialog component for BlinkBreak.
+// Exposes basic break timing fields (intervals and durations).
+
+import {
+    VerticalBox,
+    HorizontalBox,
+    Button,
+    LineEdit,
+} from "std-widgets.slint";
+
+component NumberFieldRow inherits Rectangle {
+    in property <string> label: "";
+    in property <string> unit: "";
+    in-out property <string> value: "";
+
+    height: 32px;
+
+    HorizontalBox {
+        spacing: 8px;
+        alignment: start;
+
+        Text {
+            text: root.label;
+            width: 160px;
+            vertical-alignment: center;
+            font-size: 12px;
+            color: #333333;
+        }
+
+        LineEdit {
+            width: 120px;
+            text <=> root.value;
+        }
+
+        Text {
+            text: root.unit;
+            vertical-alignment: center;
+            font-size: 12px;
+            color: #666666;
+        }
+    }
+}
+
+export component SettingsDialog inherits Window {
+    title: "Settings";
+    min-width: 420px;
+    min-height: 320px;
+
+    callback save-clicked();
+    callback cancel-clicked();
+
+    // Editable values as strings for easy binding to LineEdit.
+    // Intervals are in minutes; durations are in seconds.
+    in-out property <string> short-interval-minutes: "10";
+    in-out property <string> short-duration-seconds: "20";
+    in-out property <string> long-interval-minutes: "60";
+    in-out property <string> long-duration-seconds: "300";
+
+    in property <string> validation-error: "";
+
+    VerticalBox {
+        spacing: 14px;
+        padding: 16px;
+
+        Text {
+            text: "Settings";
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        // Short break section
+        Text {
+            text: "Short Break";
+            font-size: 14px;
+            font-weight: 600;
+            color: #444444;
+        }
+
+        NumberFieldRow {
+            label: "Interval";
+            unit: "minutes";
+            value <=> root.short-interval-minutes;
+        }
+
+        NumberFieldRow {
+            label: "Duration";
+            unit: "seconds";
+            value <=> root.short-duration-seconds;
+        }
+
+        // Long break section
+        Text {
+            text: "Long Break";
+            font-size: 14px;
+            font-weight: 600;
+            color: #444444;
+        }
+
+        NumberFieldRow {
+            label: "Interval";
+            unit: "minutes";
+            value <=> root.long-interval-minutes;
+        }
+
+        NumberFieldRow {
+            label: "Duration";
+            unit: "seconds";
+            value <=> root.long-duration-seconds;
+        }
+
+        if root.validation-error != "": Text {
+            text: root.validation-error;
+            font-size: 12px;
+            color: #d32f2f;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: end;
+
+            Button {
+                text: "Cancel";
+                clicked => {
+                    root.cancel-clicked();
+                }
+            }
+
+            Button {
+                text: "Save";
+                clicked => {
+                    root.save-clicked();
+                }
+            }
+        }
+    }
+}

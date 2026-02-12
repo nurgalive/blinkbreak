@@ -7,81 +7,55 @@ import {
     ProgressIndicator,
 } from "std-widgets.slint";
 
-// Timer display component
+import { SettingsDialog } from "components/settings_dialog.slint";
+
 component TimerDisplay inherits Rectangle {
-    in property <string> time: "00:00";
-    in property <float> progress: 0.0;
-    in property <color> accent-color: #4CAF50;
+    in property <int> short_break_count: 0;
+    in property <int> long_break_count: 0;
 
-    width: 200px;
-    height: 200px;
+    width: 160px;
+    height: 160px;
     border-radius: self.width / 2;
-    background: #f5f5f5;
+    background: #ffffff;
+    border-width: 2px;
+    border-color: #e0e0e0;
 
-    // Progress ring (simplified)
-    Rectangle {
-        x: 4px;
-        y: 4px;
-        width: parent.width - 8px;
-        height: parent.height - 8px;
-        border-radius: self.width / 2;
-        background: white;
-    }
-
-    // Time text
-    Text {
-        text: root.time;
-        font-size: 36px;
-        font-weight: 600;
-        width: parent.width;
-        height: parent.height;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-}
-
-export component SettingsDialog inherits Window {
-    title: "Settings";
-    min-width: 360px;
-    min-height: 200px;
-
-    callback save-clicked();
-    callback cancel-clicked();
-
-    VerticalBox {
-        spacing: 12px;
-        padding: 16px;
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
 
         Text {
-            text: "Settings";
-            font-size: 18px;
+            text: "Breaks";
+            font-size: 12px;
             font-weight: 600;
+            horizontal-alignment: center;
+            color: #424242;
         }
 
-        Text {
-            text: "Settings UI coming soon.";
-        }
+        HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
 
-        HorizontalBox {
-            spacing: 8px;
-            alignment: end;
-
-            Button {
-                text: "Cancel";
-                clicked => {
-                    root.cancel-clicked();
-                }
+            Text {
+                text: "Short: " + root.short_break_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
             }
 
-            Button {
-                text: "Save";
-                clicked => {
-                    root.save-clicked();
-                }
+            Text {
+                text: "Long: " + root.long_break_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
             }
         }
     }
 }
+
+export { SettingsDialog }
 
 export component MainWindow inherits Window {
     title: "BlinkBreak";
@@ -95,11 +69,15 @@ export component MainWindow inherits Window {
     callback settings-clicked();
 
     // Properties bound from C++
-    in property <string> time-remaining: "10:00";
+    in property <string> time-until-short: "10:00";
+    in property <string> time-until-long: "30:00";
     in property <string> status-text: "Ready";
-    in property <float> progress: 0.0;
+    in property <float> short-progress: 0.0;
+    in property <float> long-progress: 0.0;
+    in property <int> short-break-count: 0;
+    in property <int> long-break-count: 0;
     in property <bool> is-running: false;
-    in property <string> next-break-type: "Short";
+    in property <bool> can-skip: false;
 
     VerticalBox {
         alignment: center;
@@ -113,29 +91,46 @@ export component MainWindow inherits Window {
             horizontal-alignment: center;
         }
 
-        // Timer display
+        // Timer display (short break countdown)
         HorizontalBox {
             alignment: center;
 
             TimerDisplay {
-                time: root.time-remaining;
-                progress: root.progress;
+                short_break_count: root.short-break-count;
+                long_break_count: root.long-break-count;
             }
         }
 
-        // Next break type
-        Text {
-            text: "Next: " + root.next-break-type + " break";
-            font-size: 12px;
-            horizontal-alignment: center;
-            color: #666666;
-        }
-
-        // Progress bar
-        ProgressIndicator {
+        // Progress bars
+        VerticalBox {
             width: 100%;
-            height: 8px;
-            progress: root.progress;
+            spacing: 6px;
+
+            Text {
+                text: "Short break in: " + root.time-until-short;
+                font-size: 10px;
+                color: #666666;
+                horizontal-alignment: left;
+            }
+
+            ProgressIndicator {
+                width: 100%;
+                height: 8px;
+                progress: root.short-progress;
+            }
+
+            Text {
+                text: "Long break in: " + root.time-until-long;
+                font-size: 10px;
+                color: #666666;
+                horizontal-alignment: left;
+            }
+
+            ProgressIndicator {
+                width: 100%;
+                height: 8px;
+                progress: root.long-progress;
+            }
         }
 
         // Control buttons
@@ -156,7 +151,7 @@ export component MainWindow inherits Window {
 
             Button {
                 text: "Skip";
-                enabled: root.is-running;
+                enabled: root.can-skip;
                 clicked => {
                     root.skip-clicked();
                 }

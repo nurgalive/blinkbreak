@@ -1,5 +1,20 @@
 # BlinkBreak
 
+<!--toc:start-->
+
+- [BlinkBreak](#blinkbreak)
+  - [Features](#features)
+  - [Progress](#progress)
+  - [Building](#building)
+    - [Prerequisites](#prerequisites)
+    - [Build Commands](#build-commands)
+    - [Clangd support](#clangd-support)
+    - [Clang-Format](#clang-format)
+    - [Running](#running)
+  - [Project Structure](#project-structure)
+  - [License](#license)
+  <!--toc:end-->
+
 A lightweight, cross-platform eye strain prevention application.
 
 ## Features
@@ -71,14 +86,17 @@ cmake --preset=debug --fresh `
   -DRust_COMPILER="$toolchain\rustc.exe" `
   -DRust_CARGO="$toolchain\cargo.exe"
 
-# Configure with Rust (with explicit paths, only compiler)
-cmake --preset=debug --fresh -DRust_COMPILER="C:\Users\azn\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe"
-
 # Build
 cmake --build --preset=debug
 
 # Run tests
 ctest --preset=debug
+
+# Run tests verbosely
+ctest --preset=debug --output-on-failure -V
+
+# Save test output to file
+ctest --preset=debug -V > test_output.txt
 
 # Configure and build (Release)
 cmake --preset=release

@@ -2,9 +2,12 @@
 //
 // Replaced the more complex approximation with a compact, well-formed component
 // to avoid Slint parsing/syntax issues while keeping the visual timer.
-export component TimerDisplay inherits Rectangle {
+component TimerDisplay inherits Rectangle {
     in property <string> time: "00:00";
+    in property <string> secondary-time: "00:00";
     in property <float> progress: 0.0; // kept for future use
+    in property <int> short_break_count: 0;
+    in property <int> long_break_count: 0;
 
     // Default size; parent can override
     width: 160px;
@@ -15,14 +18,37 @@ export component TimerDisplay inherits Rectangle {
     border-color: #e0e0e0;
 
     // Centered time text
-    Text {
-        text: root.time;
-        font-size: 28px;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        color: #212121;
-        width: parent.width;
-        height: parent.height;
+    VerticalLayout {
+        alignment: center;
+        spacing: 2px;
+
+        Text {
+            text: "Breaks";
+            font-size: 12px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            color: #424242;
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
+
+            Text {
+                text: "Short: " + root.short_break_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
+            }
+
+            Text {
+                text: "Long: " + root.long_break_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
+            }
+        }
     }
 }

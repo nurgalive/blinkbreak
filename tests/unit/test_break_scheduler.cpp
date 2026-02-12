@@ -120,6 +120,46 @@ TEST_F(BreakSchedulerTest, LongBreakTriggersAtCorrectInterval) {
     EXPECT_EQ(triggered_type, BreakType::kLong);
 }
 
+/// @test Short break completion does not reset long timer progress.
+TEST_F(BreakSchedulerTest, ShortBreakDoesNotResetLongTimer) {
+    scheduler_->Start();
+    scheduler_->Update(10s);  // Trigger short break
+
+    EXPECT_TRUE(scheduler_->IsBreakActive());
+
+    scheduler_->Update(2s);  // Complete short break duration
+
+    auto long_time = scheduler_->GetTimeUntilLongBreak();
+    ASSERT_TRUE(long_time.has_value());
+    EXPECT_EQ(*long_time, 50s);
+}
+
+/// @test Long break triggers even with periodic short breaks.
+TEST_F(BreakSchedulerTest, LongBreakTriggersWithShortBreaksActive) {
+    long_config_.interval = 25s;
+    long_config_.duration = 5s;
+    scheduler_ = std::make_unique<BreakScheduler>(
+        short_config_, long_config_, overlay_config_);
+
+    BreakType triggered_type = BreakType::kShort;
+    scheduler_->SetOnBreakStart([&triggered_type](const BreakInfo& info) {
+        triggered_type = info.type;
+    });
+
+    scheduler_->Start();
+
+    scheduler_->Update(10s);  // Short break at t=10
+    scheduler_->Update(2s);   // Complete short break
+
+    scheduler_->Update(10s);  // Short break at t=20
+    scheduler_->Update(2s);   // Complete short break
+
+    scheduler_->Update(5s);   // Long break at t=25
+
+    EXPECT_EQ(triggered_type, BreakType::kLong);
+    EXPECT_TRUE(scheduler_->IsBreakActive());
+}
+
 // ============================================================================
 // Pause/Resume Tests
 // ============================================================================

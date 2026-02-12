@@ -10,6 +10,7 @@
 #include "tray_manager.hpp"
 
 #include <atomic>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -78,9 +79,37 @@ public:
     /// @return Time in "MM:SS" format.
     [[nodiscard]] std::string GetTimeRemainingString() const;
 
-    /// @brief Gets the current progress (0.0 - 1.0).
+    /// @brief Gets formatted time remaining until the next short break.
+    /// @return Time in "MM:SS" format.
+    [[nodiscard]] std::string GetTimeUntilShortBreakString() const;
+
+    /// @brief Gets formatted time remaining until the next long break.
+    /// @return Time in "MM:SS" format.
+    [[nodiscard]] std::string GetTimeUntilLongBreakString() const;
+
+    /// @brief Gets the current short-break progress (0.0 - 1.0).
     /// @return Progress value.
-    [[nodiscard]] float GetProgress() const;
+    [[nodiscard]] float GetShortProgress() const;
+
+    /// @brief Gets the current long-break progress (0.0 - 1.0).
+    /// @return Progress value.
+    [[nodiscard]] float GetLongProgress() const;
+
+    /// @brief Gets the count of completed short breaks.
+    /// @return Count of short breaks.
+    [[nodiscard]] int GetShortBreakCount() const;
+
+    /// @brief Gets the count of completed long breaks.
+    /// @return Count of long breaks.
+    [[nodiscard]] int GetLongBreakCount() const;
+
+    /// @brief Gets whether skipping is currently allowed.
+    /// @return True if the UI should enable skipping.
+    [[nodiscard]] bool GetCanSkip() const;
+
+    /// @brief Gets whether a skip operation is in progress.
+    /// @return True if a skip is currently being processed.
+    [[nodiscard]] bool IsSkipInProgress() const;
 
     /// @brief Gets the current status text.
     /// @return Status string.
@@ -103,6 +132,7 @@ private:
     std::unique_ptr<BreakScheduler> scheduler_;
     std::unique_ptr<TrayManager> tray_manager_;
     AppConfig config_;
+    std::filesystem::path config_path_;
 
     std::unique_ptr<slint::ComponentHandle<MainWindow>> main_window_;
     std::unique_ptr<slint::ComponentHandle<SettingsDialog>> settings_dialog_;
@@ -110,10 +140,17 @@ private:
     std::thread timer_thread_;
     std::atomic<bool> running_;
     mutable std::mutex mutex_;
+    mutable std::mutex scheduler_mutex_;
 
     // Cached UI state
-    std::string time_remaining_;
-    float progress_;
+    std::string time_until_short_;
+    std::string time_until_long_;
+    float short_progress_;
+    float long_progress_;
+    int short_break_count_;
+    int long_break_count_;
+    bool can_skip_;
+    bool skip_in_progress_;
     std::string status_text_;
     bool is_running_;
 };

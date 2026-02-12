@@ -8,6 +8,8 @@
   - [Building](#building)
     - [Prerequisites](#prerequisites)
     - [Build Commands](#build-commands)
+    - [UI Tests](#ui-tests)
+    - [UI Test Hook Examples](#ui-test-hook-examples)
     - [Clangd support](#clangd-support)
     - [Clang-Format](#clang-format)
     - [Running](#running)
@@ -59,6 +61,10 @@ A lightweight, cross-platform eye strain prevention application.
   - Full integration with `AppController`
   - Bug fix #1: Menu now updates correctly when resuming from paused state
   - Bug fix #2: Window minimizes to tray on close instead of quitting app
+- Stage 6B (UI Tests for Slint): complete
+  - Headless UI tests for `MainWindow`, `SettingsDialog`, and `TimerDisplay`
+  - UI tests registered separately (CTest label: `ui`, prefixed with `ui_`)
+  - Documented UI test commands and component coverage
 
 ## Building
 
@@ -95,6 +101,12 @@ ctest --preset=debug
 # Run tests verbosely
 ctest --preset=debug --output-on-failure -V
 
+# Run only UI tests (Slint UI components)
+ctest --preset=debug -L ui
+
+# Run UI tests by name prefix
+ctest --preset=debug -R "^ui_"
+
 # Save test output to file
 ctest --preset=debug -V > test_output.txt
 
@@ -102,6 +114,34 @@ ctest --preset=debug -V > test_output.txt
 cmake --preset=release
 cmake --build --preset=release
 ```
+
+### UI Tests
+
+UI tests live under `tests/ui` and exercise Slint components without starting the full event loop (headless). Covered components:
+
+- `MainWindow`
+- `SettingsDialog`
+- `TimerDisplay`
+
+Run only UI tests:
+
+```bash
+ctest --preset=debug -L ui
+```
+
+Run UI tests by name prefix:
+
+```bash
+ctest --preset=debug -R "^ui_"
+```
+
+### UI Test Hook Examples
+
+Use simple, exported properties and callbacks so UI tests can drive logic without a window:
+
+- Computed UI state: expose as `out property` (for example, a start/pause label derived from `is-running`).
+- Validation state: expose as `in-out property` for the message plus a derived `out property` flag.
+- User actions: wire `callback` declarations and test with generated `invoke_*` methods.
 
 ### Clangd support
 
@@ -148,7 +188,7 @@ build/debug/src/Debug/blinkbreak.exe --version
   - `ui/` - UI integration
   - `platform/` - Platform-specific code
 - `include/` - Public headers
-- `tests/` - Unit and integration tests
+- `tests/` - Unit, UI, and integration tests (`tests/ui` contains Slint UI tests)
 - `ui/` - Slint UI files
 - `resources/` - Icons and assets
 

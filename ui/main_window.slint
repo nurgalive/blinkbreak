@@ -77,6 +77,7 @@ export component MainWindow inherits Window {
     in property <int> short-break-count: 0;
     in property <int> long-break-count: 0;
     in property <bool> is-running: false;
+    out property <string> start-button-label: root.is-running ? "Pause" : "Start";
     in property <bool> can-skip: false;
 
     VerticalBox {
@@ -139,7 +140,7 @@ export component MainWindow inherits Window {
             spacing: 10px;
 
             Button {
-                text: root.is-running ? "Pause" : "Start";
+                text: root.start-button-label;
                 clicked => {
                     if (root.is-running) {
                         root.pause-clicked();

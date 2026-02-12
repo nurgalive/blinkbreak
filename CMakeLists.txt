@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 
+cmake_policy(SET CMP0048 NEW)
+
 project(BlinkBreak
     VERSION 0.1.0
     DESCRIPTION "Eye strain prevention application"

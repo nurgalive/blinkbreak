@@ -56,7 +56,8 @@ export component SettingsDialog inherits Window {
     in-out property <string> long-interval-minutes: "60";
     in-out property <string> long-duration-seconds: "300";
 
-    in property <string> validation-error: "";
+    in-out property <string> validation-error: "";
+    out property <bool> has-validation-error: root.validation-error != "";
 
     VerticalBox {
         spacing: 14px;

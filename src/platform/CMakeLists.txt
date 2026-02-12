@@ -35,4 +35,9 @@ if(WIN32)
     )
 endif()
 
+target_compile_definitions(blinkbreak_platform
+    PRIVATE
+        _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING
+)
+
 target_compile_features(blinkbreak_platform PUBLIC cxx_std_23)

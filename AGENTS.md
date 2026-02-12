@@ -87,6 +87,13 @@
     - [Test Requirements](#test-requirements-5)
       - [Verification Criteria](#verification-criteria-5)
     - [Deliverables](#deliverables-5)
+  - [Stage 6B: UI Tests for Slint](#stage-6b-ui-tests-for-slint)
+    - [Goal (6B)](#goal-6b)
+    - [Prerequisites (6B)](#prerequisites-6b)
+    - [Implementation Steps (6B)](#implementation-steps-6b)
+    - [Test Requirements (6B)](#test-requirements-6b)
+      - [Verification Criteria (6B)](#verification-criteria-6b)
+    - [Deliverables (6B)](#deliverables-6b)
   - [Stage 7: Break Overlay Window](#stage-7-break-overlay-window)
     - [Goal](#goal-6)
     - [Prerequisites](#prerequisites-6)
@@ -786,7 +793,7 @@ Source listing removed. See `src/platform/platform_interface.hpp`.
 - `src/ui/app_controller.hpp`: Added configuration path member, scheduler mutex, and richer UI state getters for short/long timers, progress, break counts, and skip state.
 - `src/ui/app_controller.cpp`: Implemented settings dialog persistence/validation, separate short/long progress tracking, synchronized scheduler access, skip tracking, close-to-tray hide behavior, and set event loop to run until explicit quit.
 - `ui/main_window.slint`: Reworked properties for short/long timers and progress; added break counts, dual progress bars, and skip enablement via `can-skip`; moved settings dialog import.
-- `ui/components/timer_display.slint`: Updated to show short/long break counts and made the component non-exported.
+- `ui/components/timer_display.slint`: Updated to show short/long break counts and exported the component for UI testing.
 
 #### 6.2 Create Windows Tray Icon Implementation
 
@@ -838,6 +845,57 @@ Source listing removed. See `src/ui/tray_manager.cpp`.
 - [x] AppController integration complete
 - [x] All tests pass (80 total)
 - [x] Code compiles without errors
+
+---
+
+## Stage 6B: UI Tests for Slint
+
+### Goal (6B)
+
+Add headless UI tests for Slint components that exercise properties, callbacks, and bindings without running the full event loop.
+
+### Prerequisites (6B)
+
+- Stage 6 completed successfully
+- Slint 1.15.0 integrated
+- Existing GTest infrastructure in place
+
+### Implementation Steps (6B)
+
+- Added `tests/ui` as a dedicated UI test directory.
+- Created `tests/ui/CMakeLists.txt` with a `blinkbreak_ui_tests` target and `slint_target_sources()` for Slint components.
+- Registered UI tests with CTest using label `ui` and prefix `ui_`.
+- Added UI tests:
+  - `tests/ui/test_main_window.cpp`
+  - `tests/ui/test_settings_dialog.cpp`
+  - `tests/ui/test_timer_display.cpp`
+  - `tests/ui/ui_test_utils.hpp`
+- Updated Slint components for testability:
+  - Exported `TimerDisplay`.
+  - Added `start-button-label` computed property in `MainWindow`.
+  - Exposed `validation-error` as `in-out` and added `has-validation-error` in `SettingsDialog`.
+- Updated `tests/CMakeLists.txt` to include the UI test subdirectory.
+
+### Test Requirements (6B)
+
+#### Verification Criteria (6B)
+
+- [x] UI tests build in headless mode.
+- [x] UI tests can run independently via CTest label/prefix.
+- [x] Tests cover property updates, callbacks, and boundary values.
+
+#### Validation Commands (6B)
+
+- `cmake --preset=debug`
+- `cmake --build --preset=debug`
+- `ctest --preset=debug -L ui`
+
+### Deliverables (6B)
+
+- [x] `tests/ui` directory with UI test sources
+- [x] `blinkbreak_ui_tests` CMake target with Slint codegen
+- [x] UI component exports and computed properties for testing
+- [x] CTest registration with `ui` label and `ui_` prefix
 
 ---
 

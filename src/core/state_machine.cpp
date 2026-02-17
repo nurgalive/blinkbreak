@@ -67,7 +67,7 @@ std::optional<State> StateMachine::GetNextState(const Event& event) const {
                     return State::kRunning;
                 }
             } else if constexpr (std::is_same_v<T, PauseEvent>) {
-                if (current_state_ == State::kRunning) {
+                if (current_state_ == State::kRunning || current_state_ == State::kSnoozed) {
                     return State::kPaused;
                 }
             } else if constexpr (std::is_same_v<T, ResumeEvent>) {

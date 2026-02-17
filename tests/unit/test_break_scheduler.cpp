@@ -93,6 +93,22 @@ TEST_F(BreakSchedulerTest, BreakTriggersWhenTimerExpires) {
     EXPECT_TRUE(scheduler_->IsBreakActive());
 }
 
+/// @test Break remaining time is available while active.
+/// @details Ensures GetTimeUntilBreakEnds reports the active break countdown.
+TEST_F(BreakSchedulerTest, BreakRemainingTimeAvailableDuringActiveBreak) {
+    scheduler_->Start();
+    scheduler_->Update(10s);  // Trigger short break
+
+    auto remaining = scheduler_->GetTimeUntilBreakEnds();
+    ASSERT_TRUE(remaining.has_value());
+    EXPECT_EQ(*remaining, 2s);
+
+    scheduler_->Update(1s);
+    remaining = scheduler_->GetTimeUntilBreakEnds();
+    ASSERT_TRUE(remaining.has_value());
+    EXPECT_EQ(*remaining, 1s);
+}
+
 // ============================================================================
 // Break Type Tests
 // ============================================================================
@@ -101,6 +117,36 @@ TEST_F(BreakSchedulerTest, BreakTriggersWhenTimerExpires) {
 TEST_F(BreakSchedulerTest, GetNextBreakTypeReturnsShortFirst) {
     scheduler_->Start();
     EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kShort);
+}
+
+/// @test When timers align, long break should be selected.
+TEST_F(BreakSchedulerTest, GetNextBreakTypePrefersLongOnTie) {
+    short_config_.interval = 10s;
+    long_config_.interval = 10s;
+    scheduler_ = std::make_unique<BreakScheduler>(
+        short_config_, long_config_, overlay_config_);
+
+    scheduler_->Start();
+    EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kLong);
+}
+
+/// @test When timers expire together, long break should trigger.
+TEST_F(BreakSchedulerTest, LongBreakTriggersWhenTimersAlign) {
+    short_config_.interval = 10s;
+    long_config_.interval = 10s;
+    scheduler_ = std::make_unique<BreakScheduler>(
+        short_config_, long_config_, overlay_config_);
+
+    BreakType triggered_type = BreakType::kShort;
+    scheduler_->SetOnBreakStart([&triggered_type](const BreakInfo& info) {
+        triggered_type = info.type;
+    });
+
+    scheduler_->Start();
+    scheduler_->Update(10s);
+
+    EXPECT_EQ(triggered_type, BreakType::kLong);
+    EXPECT_TRUE(scheduler_->IsBreakActive());
 }
 
 /// @test Long break triggers at correct interval.
@@ -209,6 +255,33 @@ TEST_F(BreakSchedulerTest, SnoozeBreakDelaysBreak) {
 
     scheduler_->SnoozeBreak();
     EXPECT_FALSE(scheduler_->IsBreakActive());
+}
+
+/// @test Snooze extends both short and long timers.
+TEST_F(BreakSchedulerTest, SnoozeExtendsTimers) {
+    scheduler_->Start();
+    scheduler_->Update(10s);  // Trigger short break
+
+    scheduler_->SnoozeBreak(5s);
+
+    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+    auto long_remaining = scheduler_->GetTimeUntilLongBreak();
+
+    ASSERT_TRUE(short_remaining.has_value());
+    ASSERT_TRUE(long_remaining.has_value());
+    EXPECT_EQ(*short_remaining, 5s);
+    EXPECT_EQ(*long_remaining, 55s);
+}
+
+/// @test Snooze updates interval totals for progress calculations.
+TEST_F(BreakSchedulerTest, SnoozeUpdatesIntervalTotals) {
+    scheduler_->Start();
+    scheduler_->Update(10s);  // Trigger short break
+
+    scheduler_->SnoozeBreak(5s);
+
+    EXPECT_EQ(scheduler_->GetShortIntervalTotal(), 15s);
+    EXPECT_EQ(scheduler_->GetLongIntervalTotal(), 65s);
 }
 
 // ============================================================================

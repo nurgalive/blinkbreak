@@ -40,7 +40,7 @@ struct OverlayConfig {
     bool show_on_all_monitors = true;             ///< Show overlay on all monitors.
     bool allow_skip = true;                       ///< Allow skipping breaks.
     bool allow_snooze = true;                     ///< Allow snoozing breaks.
-    Duration snooze_duration = Duration::zero();  ///< Default snooze duration.
+    Duration snooze_duration = Duration(300);  ///< Default snooze duration.
 };
 
 /// @brief Complete application configuration.

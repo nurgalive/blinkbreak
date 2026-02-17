@@ -42,6 +42,8 @@ if(NOT TARGET blinkbreak_ui)
         PRIVATE
             ui/app_controller.cpp
             ui/app_controller.hpp
+            ui/overlay_manager.cpp
+            ui/overlay_manager.hpp
             ui/tray_manager.cpp
             ui/tray_manager.hpp
     )
@@ -67,6 +69,7 @@ if(NOT TARGET blinkbreak_ui)
     )
     slint_target_sources(blinkbreak_ui
         ${PROJECT_SOURCE_DIR}/ui/main_window.slint
+        ${PROJECT_SOURCE_DIR}/ui/overlay.slint
         ${PROJECT_SOURCE_DIR}/ui/components/timer_display.slint
     )
 endif()

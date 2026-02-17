@@ -55,6 +55,7 @@ export component SettingsDialog inherits Window {
     in-out property <string> short-duration-seconds: "20";
     in-out property <string> long-interval-minutes: "60";
     in-out property <string> long-duration-seconds: "300";
+    in-out property <string> snooze-duration-minutes: "5";
 
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
@@ -107,6 +108,20 @@ export component SettingsDialog inherits Window {
             label: "Duration";
             unit: "seconds";
             value <=> root.long-duration-seconds;
+        }
+
+        // Overlay section
+        Text {
+            text: "Overlay";
+            font-size: 14px;
+            font-weight: 600;
+            color: #444444;
+        }
+
+        NumberFieldRow {
+            label: "Snooze";
+            unit: "minutes";
+            value <=> root.snooze-duration-minutes;
         }
 
         if root.validation-error != "": Text {

@@ -56,6 +56,10 @@ public:
     /// @brief Resets the timer to its initial duration.
     void Reset();
 
+    /// @brief Extends the timer by the specified duration.
+    /// @param extension The duration to add to the remaining time.
+    void Extend(Duration extension);
+
     /// @brief Checks if the timer is currently running.
     /// @return True if the timer is running, false otherwise.
     [[nodiscard]] bool IsRunning() const;

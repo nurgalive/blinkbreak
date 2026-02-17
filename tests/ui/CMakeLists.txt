@@ -4,6 +4,7 @@ if(NOT TARGET blinkbreak_ui_tests)
         test_main_window.cpp
         test_settings_dialog.cpp
         test_timer_display.cpp
+        test_overlay.cpp
     )
 
     target_link_libraries(blinkbreak_ui_tests
@@ -37,6 +38,7 @@ if(NOT TARGET blinkbreak_ui_tests)
 
     slint_target_sources(blinkbreak_ui_tests
         ${PROJECT_SOURCE_DIR}/ui/main_window.slint
+        ${PROJECT_SOURCE_DIR}/ui/overlay.slint
         ${PROJECT_SOURCE_DIR}/ui/components/timer_display.slint
     )
 

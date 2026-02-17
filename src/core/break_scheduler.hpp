@@ -103,6 +103,18 @@ public:
     /// @return Time until the next long break, or nullopt if not running.
     [[nodiscard]] std::optional<Duration> GetTimeUntilLongBreak() const;
 
+    /// @brief Gets the effective total interval for short breaks (includes snooze extensions).
+    /// @return Total short-break interval.
+    [[nodiscard]] Duration GetShortIntervalTotal() const;
+
+    /// @brief Gets the effective total interval for long breaks (includes snooze extensions).
+    /// @return Total long-break interval.
+    [[nodiscard]] Duration GetLongIntervalTotal() const;
+
+    /// @brief Gets the remaining time on the active break.
+    /// @return Remaining break time, or nullopt if no break is active.
+    [[nodiscard]] std::optional<Duration> GetTimeUntilBreakEnds() const;
+
     /// @brief Gets the type of the next break.
     /// @return The type of the next scheduled break.
     [[nodiscard]] BreakType GetNextBreakType() const;
@@ -155,6 +167,9 @@ private:
     BreakConfig short_config_;     ///< Short break configuration.
     BreakConfig long_config_;      ///< Long break configuration.
     OverlayConfig overlay_config_; ///< Overlay configuration.
+
+    Duration short_interval_total_;  ///< Short-break interval with snooze extensions.
+    Duration long_interval_total_;   ///< Long-break interval with snooze extensions.
 
     bool is_running_;             ///< Whether scheduler is running.
     bool break_active_;           ///< Whether a break is currently active.

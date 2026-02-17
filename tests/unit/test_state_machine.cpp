@@ -111,6 +111,17 @@ TEST_F(StateMachineTest, SnoozedToBreakActiveOnSnoozeExpired) {
     EXPECT_EQ(result.new_state, State::kBreakActive);
 }
 
+/// @test Snoozed -> Paused on PauseEvent.
+TEST_F(StateMachineTest, SnoozedToPausedOnPause) {
+    sm_->ProcessEvent(StartEvent{});
+    sm_->ProcessEvent(TimerExpiredEvent{BreakType::kShort});
+    sm_->ProcessEvent(SnoozeEvent{5min});
+    auto result = sm_->ProcessEvent(PauseEvent{});
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.new_state, State::kPaused);
+}
+
 /// @test Running -> Idle on ResetEvent.
 TEST_F(StateMachineTest, RunningToIdleOnReset) {
     sm_->ProcessEvent(StartEvent{});

@@ -15,6 +15,8 @@ BreakScheduler::BreakScheduler(const BreakConfig& short_break,
     : short_config_(short_break),
       long_config_(long_break),
       overlay_config_(overlay),
+      short_interval_total_(short_break.interval),
+      long_interval_total_(long_break.interval),
       is_running_(false),
       break_active_(false),
       active_break_type_(BreakType::kShort),
@@ -129,6 +131,8 @@ void BreakScheduler::Reset() {
     long_timer_->Reset();
     break_timer_->Reset();
     snooze_timer_->Reset();
+    short_interval_total_ = short_config_.interval;
+    long_interval_total_ = long_config_.interval;
 
     short_messages_->Reset();
     long_messages_->Reset();
@@ -149,11 +153,13 @@ void BreakScheduler::SkipBreak() {
 
     if (short_config_.enabled) {
         short_timer_->Reset();
+        short_interval_total_ = short_config_.interval;
         short_timer_->Start();
     }
     if (long_config_.enabled) {
         if (active_break_type_ == BreakType::kLong) {
             long_timer_->Reset();
+            long_interval_total_ = long_config_.interval;
         }
         long_timer_->Start();
     }
@@ -180,13 +186,32 @@ void BreakScheduler::SnoozeBreak(std::optional<Duration> duration) {
 
     break_active_ = false;
     break_timer_->Pause();
+    warning_sent_ = false;
 
     Duration snooze_dur = duration.value_or(overlay_config_.snooze_duration);
-    snooze_timer_ = std::make_unique<Timer>(snooze_dur);
-    snooze_timer_->SetOnExpired([this]() { TriggerBreak(active_break_type_); });
-    snooze_timer_->Start();
+    if (snooze_dur <= Duration::zero()) {
+        spdlog::warn("Snooze duration is non-positive; ignoring snooze");
+        return;
+    }
 
-    spdlog::info("Break snoozed for {}s", snooze_dur.count());
+    snooze_timer_->Reset();
+
+    if (short_config_.enabled) {
+        short_timer_->Extend(snooze_dur);
+        short_interval_total_ += snooze_dur;
+        if (is_running_) {
+            short_timer_->Start();
+        }
+    }
+    if (long_config_.enabled) {
+        long_timer_->Extend(snooze_dur);
+        long_interval_total_ += snooze_dur;
+        if (is_running_) {
+            long_timer_->Start();
+        }
+    }
+
+    spdlog::info("Break snoozed for {}s; timers extended", snooze_dur.count());
 }
 
 void BreakScheduler::CompleteBreak() {
@@ -214,11 +239,13 @@ void BreakScheduler::CompleteBreak() {
 
     if (short_config_.enabled) {
         short_timer_->Reset();
+        short_interval_total_ = short_config_.interval;
         short_timer_->Start();
     }
     if (long_config_.enabled) {
         if (active_break_type_ == BreakType::kLong) {
             long_timer_->Reset();
+            long_interval_total_ = long_config_.interval;
         }
         long_timer_->Start();
     }
@@ -234,8 +261,8 @@ void BreakScheduler::Update(DurationMs delta_time) {
     } else if (snooze_timer_->IsRunning()) {
         snooze_timer_->Update(delta_time);
     } else {
-        short_timer_->Update(delta_time);
         long_timer_->Update(delta_time);
+        short_timer_->Update(delta_time);
         CheckWarnings();
     }
 }
@@ -269,6 +296,22 @@ std::optional<Duration> BreakScheduler::GetTimeUntilLongBreak() const {
     return long_timer_->GetRemaining();
 }
 
+Duration BreakScheduler::GetShortIntervalTotal() const {
+    return short_interval_total_;
+}
+
+Duration BreakScheduler::GetLongIntervalTotal() const {
+    return long_interval_total_;
+}
+
+std::optional<Duration> BreakScheduler::GetTimeUntilBreakEnds() const {
+    if (!break_active_) {
+        return std::nullopt;
+    }
+
+    return break_timer_->GetRemaining();
+}
+
 BreakType BreakScheduler::GetNextBreakType() const {
     if (!short_config_.enabled) {
         return BreakType::kLong;
@@ -277,7 +320,7 @@ BreakType BreakScheduler::GetNextBreakType() const {
         return BreakType::kShort;
     }
 
-    return short_timer_->GetRemaining() <= long_timer_->GetRemaining()
+    return short_timer_->GetRemaining() < long_timer_->GetRemaining()
                ? BreakType::kShort
                : BreakType::kLong;
 }
@@ -309,6 +352,8 @@ void BreakScheduler::UpdateConfig(const BreakConfig& short_break,
     short_config_ = short_break;
     long_config_ = long_break;
     overlay_config_ = overlay;
+    short_interval_total_ = short_break.interval;
+    long_interval_total_ = long_break.interval;
 
     short_messages_->SetMessages(short_break.messages);
     short_messages_->SetRotate(short_break.rotate_messages);

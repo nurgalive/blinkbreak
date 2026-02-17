@@ -56,6 +56,16 @@ void Timer::Reset() {
     spdlog::debug("Timer reset to {}s", total_duration_.count());
 }
 
+void Timer::Extend(Duration extension) {
+    if (extension <= Duration::zero()) {
+        return;
+    }
+
+    remaining_ += extension;
+    spdlog::debug("Timer extended by {}s, remaining {}s", extension.count(),
+                  remaining_.count());
+}
+
 bool Timer::IsRunning() const {
     return is_running_.load();
 }

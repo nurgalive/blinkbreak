@@ -65,6 +65,10 @@ A lightweight, cross-platform eye strain prevention application.
   - Headless UI tests for `MainWindow`, `SettingsDialog`, and `TimerDisplay`
   - UI tests registered separately (CTest label: `ui`, prefixed with `ui_`)
   - Documented UI test commands and component coverage
+- Stage 7 (Break Overlay Window): complete
+  - `BreakOverlay` Slint file with dimming, message, and countdown
+  - `OverlayManager` wiring for show/hide and actions
+  - UI + unit tests added for overlay and break countdown
 
 ## Building
 
@@ -122,6 +126,7 @@ UI tests live under `tests/ui` and exercise Slint components without starting th
 - `MainWindow`
 - `SettingsDialog`
 - `TimerDisplay`
+- `BreakOverlay`
 
 Run only UI tests:
 

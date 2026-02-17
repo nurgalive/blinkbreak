@@ -20,6 +20,8 @@ TEST(TimerDisplayUiTest, DefaultValuesAreAvailable) {
     EXPECT_FLOAT_EQ(display->get_progress(), 0.0f);
     EXPECT_EQ(display->get_short_break_count(), 0);
     EXPECT_EQ(display->get_long_break_count(), 0);
+    EXPECT_EQ(display->get_short_skipped_count(), 0);
+    EXPECT_EQ(display->get_long_skipped_count(), 0);
 }
 
 /// @test Verifies property round-trips for TimerDisplay.
@@ -33,12 +35,16 @@ TEST(TimerDisplayUiTest, PropertiesRoundTrip) {
     display->set_progress(0.75f);
     display->set_short_break_count(3);
     display->set_long_break_count(1);
+    display->set_short_skipped_count(2);
+    display->set_long_skipped_count(4);
 
     EXPECT_EQ(ToStdString(display->get_time()), "05:30");
     EXPECT_EQ(ToStdString(display->get_secondary_time()), "25:00");
     EXPECT_FLOAT_EQ(display->get_progress(), 0.75f);
     EXPECT_EQ(display->get_short_break_count(), 3);
     EXPECT_EQ(display->get_long_break_count(), 1);
+    EXPECT_EQ(display->get_short_skipped_count(), 2);
+    EXPECT_EQ(display->get_long_skipped_count(), 4);
 }
 
 /// @test Verifies progress accepts boundary values.
@@ -60,13 +66,21 @@ TEST(TimerDisplayUiTest, BreakCountsAcceptEdgeValues) {
     
     display->set_short_break_count(0);
     display->set_long_break_count(0);
+    display->set_short_skipped_count(0);
+    display->set_long_skipped_count(0);
     EXPECT_EQ(display->get_short_break_count(), 0);
     EXPECT_EQ(display->get_long_break_count(), 0);
+    EXPECT_EQ(display->get_short_skipped_count(), 0);
+    EXPECT_EQ(display->get_long_skipped_count(), 0);
 
     display->set_short_break_count(42);
     display->set_long_break_count(7);
+    display->set_short_skipped_count(5);
+    display->set_long_skipped_count(9);
     EXPECT_EQ(display->get_short_break_count(), 42);
     EXPECT_EQ(display->get_long_break_count(), 7);
+    EXPECT_EQ(display->get_short_skipped_count(), 5);
+    EXPECT_EQ(display->get_long_skipped_count(), 9);
 }
 
 }  // namespace

@@ -12,6 +12,8 @@ import { SettingsDialog } from "components/settings_dialog.slint";
 component TimerDisplay inherits Rectangle {
     in property <int> short_break_count: 0;
     in property <int> long_break_count: 0;
+    in property <int> short_skipped_count: 0;
+    in property <int> long_skipped_count: 0;
 
     width: 160px;
     height: 160px;
@@ -52,6 +54,35 @@ component TimerDisplay inherits Rectangle {
                 color: #757575;
             }
         }
+
+        Text {
+            text: "Skipped";
+            font-size: 11px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            color: #424242;
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
+
+            Text {
+                text: "Short: " + root.short_skipped_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
+            }
+
+            Text {
+                text: "Long: " + root.long_skipped_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: #757575;
+            }
+        }
     }
 }
 
@@ -65,20 +96,21 @@ export component MainWindow inherits Window {
     // Callbacks to C++
     callback start-clicked();
     callback pause-clicked();
-    callback skip-clicked();
     callback settings-clicked();
 
     // Properties bound from C++
     in property <string> time-until-short: "10:00";
     in property <string> time-until-long: "30:00";
+    in property <string> tracked-time: "00:00";
     in property <string> status-text: "Ready";
     in property <float> short-progress: 0.0;
     in property <float> long-progress: 0.0;
     in property <int> short-break-count: 0;
     in property <int> long-break-count: 0;
+    in property <int> short-skipped-count: 0;
+    in property <int> long-skipped-count: 0;
     in property <bool> is-running: false;
     out property <string> start-button-label: root.is-running ? "Pause" : "Start";
-    in property <bool> can-skip: false;
 
     VerticalBox {
         alignment: center;
@@ -99,6 +131,8 @@ export component MainWindow inherits Window {
             TimerDisplay {
                 short_break_count: root.short-break-count;
                 long_break_count: root.long-break-count;
+                short_skipped_count: root.short-skipped-count;
+                long_skipped_count: root.long-skipped-count;
             }
         }
 
@@ -132,6 +166,13 @@ export component MainWindow inherits Window {
                 height: 8px;
                 progress: root.long-progress;
             }
+
+            Text {
+                text: "Tracked time: " + root.tracked-time;
+                font-size: 10px;
+                color: #666666;
+                horizontal-alignment: left;
+            }
         }
 
         // Control buttons
@@ -147,14 +188,6 @@ export component MainWindow inherits Window {
                     } else {
                         root.start-clicked();
                     }
-                }
-            }
-
-            Button {
-                text: "Skip";
-                enabled: root.can-skip;
-                clicked => {
-                    root.skip-clicked();
                 }
             }
 

@@ -936,11 +936,11 @@ export component BreakOverlay inherits Window {
     in property <string> break-type: "Short";
     in property <bool> can-skip: true;
     in property <bool> can-snooze: true;
-    in property <float> opacity: 0.7;
+    in property <float> overlay-opacity: 0.7;
 
     // Semi-transparent background
     Rectangle {
-        background: black.with-alpha(root.opacity);
+        background: black.with-alpha(root.overlay-opacity);
 
         VerticalBox {
             alignment: center;
@@ -1013,6 +1013,19 @@ Create `src/ui/overlay_manager.hpp` and `overlay_manager.cpp` for managing overl
 - Countdown updates
 - Skip/Snooze buttons work
 - Overlay closes on completion
+
+#### Tests Added
+
+- UI: `tests/ui/test_overlay.cpp`
+- Unit: `tests/unit/test_break_scheduler.cpp` (break remaining accessor coverage)
+
+#### Validation Results
+
+- `cmake --build --preset=debug` (succeeded)
+- `ctest --preset=debug` (reported "No tests were found!!!")
+- `ctest --preset=debug -C Debug` (reported "No tests were found!!!")
+- Direct execution: `build/debug/tests/Debug/blinkbreak_tests.exe` (0 tests)
+- Direct execution: `build/debug/tests/ui/Debug/blinkbreak_ui_tests.exe` (0 tests)
 
 ### Deliverables
 

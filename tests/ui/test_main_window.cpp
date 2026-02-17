@@ -52,48 +52,48 @@ TEST(MainWindowUiTest, PauseClickedInvokesCallback) {
     EXPECT_EQ(pause_spy.count, 1);
 }
 
-/// @test Verifies skip and settings callbacks are invoked.
-/// @details Ensures that both `skip-clicked` and `settings-clicked` callbacks
-/// fire and each callback spy records a single invocation.
-TEST(MainWindowUiTest, SkipAndSettingsCallbacksInvoke) {
+/// @test Verifies settings callback is invoked.
+/// @details Ensures that `settings-clicked` fires and the callback spy records
+/// a single invocation.
+TEST(MainWindowUiTest, SettingsCallbackInvokes) {
     auto window = MainWindow::create();
     
-    CallbackSpy skip_spy;
     CallbackSpy settings_spy;
 
-    window->on_skip_clicked([&skip_spy]() { skip_spy(); });
     window->on_settings_clicked([&settings_spy]() { settings_spy(); });
 
-    window->invoke_skip_clicked();
     window->invoke_settings_clicked();
 
-    EXPECT_EQ(skip_spy.count, 1);
     EXPECT_EQ(settings_spy.count, 1);
 }
 
 /// @test Verifies property round-trips for main window state.
 /// @details Sets multiple properties (time strings, status, progress, counts,
-/// and skip enablement) and verifies getters return identical values.
+/// tracked time, and skipped counts) and verifies getters return identical values.
 TEST(MainWindowUiTest, PropertiesRoundTrip) {
     auto window = MainWindow::create();
     
     window->set_time_until_short("05:00");
     window->set_time_until_long("25:00");
+    window->set_tracked_time("00:45");
     window->set_status_text("Running");
     window->set_short_progress(0.25f);
     window->set_long_progress(0.5f);
     window->set_short_break_count(2);
     window->set_long_break_count(1);
-    window->set_can_skip(true);
+    window->set_short_skipped_count(1);
+    window->set_long_skipped_count(3);
 
     EXPECT_EQ(ToStdString(window->get_time_until_short()), "05:00");
     EXPECT_EQ(ToStdString(window->get_time_until_long()), "25:00");
+    EXPECT_EQ(ToStdString(window->get_tracked_time()), "00:45");
     EXPECT_EQ(ToStdString(window->get_status_text()), "Running");
     EXPECT_FLOAT_EQ(window->get_short_progress(), 0.25f);
     EXPECT_FLOAT_EQ(window->get_long_progress(), 0.5f);
     EXPECT_EQ(window->get_short_break_count(), 2);
     EXPECT_EQ(window->get_long_break_count(), 1);
-    EXPECT_TRUE(window->get_can_skip());
+    EXPECT_EQ(window->get_short_skipped_count(), 1);
+    EXPECT_EQ(window->get_long_skipped_count(), 3);
 }
 
 }  // namespace

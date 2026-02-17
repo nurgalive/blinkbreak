@@ -7,6 +7,7 @@
 #include "core/break_scheduler.hpp"
 #include "core/config_manager.hpp"
 #include "core/state_machine.hpp"
+#include "overlay_manager.hpp"
 #include "tray_manager.hpp"
 
 #include <atomic>
@@ -87,6 +88,10 @@ public:
     /// @return Time in "MM:SS" format.
     [[nodiscard]] std::string GetTimeUntilLongBreakString() const;
 
+    /// @brief Gets formatted tracked time string.
+    /// @return Time in "MM:SS" format.
+    [[nodiscard]] std::string GetTrackedTimeString() const;
+
     /// @brief Gets the current short-break progress (0.0 - 1.0).
     /// @return Progress value.
     [[nodiscard]] float GetShortProgress() const;
@@ -103,13 +108,13 @@ public:
     /// @return Count of long breaks.
     [[nodiscard]] int GetLongBreakCount() const;
 
-    /// @brief Gets whether skipping is currently allowed.
-    /// @return True if the UI should enable skipping.
-    [[nodiscard]] bool GetCanSkip() const;
+    /// @brief Gets the count of skipped short breaks.
+    /// @return Count of skipped short breaks.
+    [[nodiscard]] int GetShortSkippedCount() const;
 
-    /// @brief Gets whether a skip operation is in progress.
-    /// @return True if a skip is currently being processed.
-    [[nodiscard]] bool IsSkipInProgress() const;
+    /// @brief Gets the count of skipped long breaks.
+    /// @return Count of skipped long breaks.
+    [[nodiscard]] int GetLongSkippedCount() const;
 
     /// @brief Gets the current status text.
     /// @return Status string.
@@ -131,6 +136,7 @@ private:
     std::unique_ptr<StateMachine> state_machine_;
     std::unique_ptr<BreakScheduler> scheduler_;
     std::unique_ptr<TrayManager> tray_manager_;
+    std::unique_ptr<OverlayManager> overlay_manager_;
     AppConfig config_;
     std::filesystem::path config_path_;
 
@@ -145,11 +151,15 @@ private:
     // Cached UI state
     std::string time_until_short_;
     std::string time_until_long_;
+    std::string tracked_time_;
+    Duration tracked_duration_;
+    DurationMs tracked_duration_ms_;
     float short_progress_;
     float long_progress_;
     int short_break_count_;
     int long_break_count_;
-    bool can_skip_;
+    int short_skipped_count_;
+    int long_skipped_count_;
     bool skip_in_progress_;
     std::string status_text_;
     bool is_running_;

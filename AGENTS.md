@@ -916,90 +916,7 @@ Implement the full-screen overlay window that displays during breaks with dimmin
 
 Create `ui/overlay.slint`:
 
-```slint
-// Break overlay window
-
-import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
-
-export component BreakOverlay inherits Window {
-    title: "Break";
-    no-frame: true;
-    always-on-top: true;
-
-    // Callbacks
-    callback skip-clicked();
-    callback snooze-clicked();
-
-    // Properties
-    in property <string> message: "Take a break!";
-    in property <string> time-remaining: "00:20";
-    in property <string> break-type: "Short";
-    in property <bool> can-skip: true;
-    in property <bool> can-snooze: true;
-    in property <float> overlay-opacity: 0.7;
-
-    // Semi-transparent background
-    Rectangle {
-        background: black.with-alpha(root.overlay-opacity);
-
-        VerticalBox {
-            alignment: center;
-
-            // Break type indicator
-            Text {
-                text: root.break-type + " Break";
-                font-size: 18px;
-                color: white.with-alpha(0.7);
-                horizontal-alignment: center;
-            }
-
-            // Main message
-            Text {
-                text: root.message;
-                font-size: 32px;
-                font-weight: 600;
-                color: white;
-                horizontal-alignment: center;
-            }
-
-            // Spacer
-            Rectangle {
-                height: 30px;
-            }
-
-            // Time remaining
-            Text {
-                text: root.time-remaining;
-                font-size: 72px;
-                font-weight: 700;
-                color: white;
-                horizontal-alignment: center;
-            }
-
-            // Spacer
-            Rectangle {
-                height: 40px;
-            }
-
-            // Action buttons
-            HorizontalBox {
-                alignment: center;
-                spacing: 20px;
-
-                if root.can-skip: Button {
-                    text: "Skip";
-                    clicked => { root.skip-clicked(); }
-                }
-
-                if root.can-snooze: Button {
-                    text: "Snooze (5 min)";
-                    clicked => { root.snooze-clicked(); }
-                }
-            }
-        }
-    }
-}
-```
+Source listing removed. See `ui/overlay.slint`.
 
 #### 7.2 Create Overlay Manager
 
@@ -1021,11 +938,9 @@ Create `src/ui/overlay_manager.hpp` and `overlay_manager.cpp` for managing overl
 
 #### Validation Results
 
+- `cmake --preset=debug --fresh` (configured; RapidJSON dev warnings)
 - `cmake --build --preset=debug` (succeeded)
 - `ctest --preset=debug` (reported "No tests were found!!!")
-- `ctest --preset=debug -C Debug` (reported "No tests were found!!!")
-- Direct execution: `build/debug/tests/Debug/blinkbreak_tests.exe` (0 tests)
-- Direct execution: `build/debug/tests/ui/Debug/blinkbreak_ui_tests.exe` (0 tests)
 
 ### Deliverables
 

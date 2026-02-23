@@ -1,0 +1,10 @@
+[
+  {
+    "label": "run tests (windows version)",
+    "command": "cmake --preset=debug --fresh; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; cmake --build --preset=debug; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; ctest --preset=debug; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+  },
+]

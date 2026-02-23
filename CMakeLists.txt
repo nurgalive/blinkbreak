@@ -79,7 +79,7 @@ set(ENV{RUSTFLAGS} "$ENV{RUSTFLAGS} -Awarnings")
 FetchContent_Declare(
     slint
     GIT_REPOSITORY https://github.com/slint-ui/slint.git
-    GIT_TAG v1.15.0
+    GIT_TAG v1.15.1
     SOURCE_SUBDIR api/cpp
 )
 FetchContent_MakeAvailable(slint)

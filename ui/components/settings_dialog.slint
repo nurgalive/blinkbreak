@@ -6,6 +6,7 @@ import {
     HorizontalBox,
     Button,
     LineEdit,
+    CheckBox,
 } from "std-widgets.slint";
 
 component NumberFieldRow inherits Rectangle {
@@ -56,6 +57,7 @@ export component SettingsDialog inherits Window {
     in-out property <string> long-interval-minutes: "60";
     in-out property <string> long-duration-seconds: "300";
     in-out property <string> snooze-duration-minutes: "5";
+    in-out property <bool> show-on-all-monitors: true;
 
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
@@ -122,6 +124,23 @@ export component SettingsDialog inherits Window {
             label: "Snooze";
             unit: "minutes";
             value <=> root.snooze-duration-minutes;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: start;
+
+            Text {
+                text: "Show on all monitors";
+                width: 160px;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: #333333;
+            }
+
+            CheckBox {
+                checked <=> root.show-on-all-monitors;
+            }
         }
 
         if root.validation-error != "": Text {

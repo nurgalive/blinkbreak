@@ -5,6 +5,8 @@ add_library(blinkbreak_platform STATIC)
 target_sources(blinkbreak_platform
     PRIVATE
         platform_interface.hpp
+        monitor_manager.hpp
+        monitor_manager.cpp
 )
 
 # Add Windows-specific sources if on Windows
@@ -13,6 +15,8 @@ if(WIN32)
         PRIVATE
             windows/tray_icon_win.hpp
             windows/tray_icon_win.cpp
+            windows/monitor_manager_win.hpp
+            windows/monitor_manager_win.cpp
     )
 endif()
 

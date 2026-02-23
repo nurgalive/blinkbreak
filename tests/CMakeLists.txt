@@ -6,11 +6,13 @@ if(NOT TARGET blinkbreak_tests)
         unit/test_config_manager.cpp
         unit/test_message_provider.cpp
         unit/test_break_scheduler.cpp
+        unit/test_overlay_manager.cpp
     )
 
     target_link_libraries(blinkbreak_tests
         PRIVATE
             blinkbreak_core
+            blinkbreak_ui
             GTest::gtest
             GTest::gtest_main
             GTest::gmock

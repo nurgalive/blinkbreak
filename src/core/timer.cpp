@@ -41,7 +41,7 @@ Timer& Timer::operator=(Timer&& other) noexcept {
 
 void Timer::Start() {
     is_running_.store(true);
-    spdlog::debug("Timer started");
+    spdlog::debug("Timer started with {}s remaining", remaining_.count());
 }
 
 void Timer::Pause() {

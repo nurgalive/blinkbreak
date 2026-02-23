@@ -966,36 +966,37 @@ Extend the overlay system to support multiple monitors with configurable display
 
 #### 8.1 Create Monitor Manager Interface
 
-```cpp
-/// @brief Information about a display monitor.
-struct MonitorInfo {
-    int id;                   ///< Monitor identifier.
-    std::string name;         ///< Display name.
-    int x, y;                 ///< Position.
-    int width, height;        ///< Dimensions.
-    bool is_primary;          ///< Whether this is the primary monitor.
-};
-
-/// @brief Interface for monitor management.
-class IMonitorManager {
-public:
-    virtual ~IMonitorManager() = default;
-    virtual std::vector<MonitorInfo> GetMonitors() = 0;
-    virtual MonitorInfo GetPrimaryMonitor() = 0;
-    virtual void SetOnMonitorChange(std::function<void()> callback) = 0;
-};
-```
+Implemented `src/platform/monitor_manager.hpp` with `MonitorInfo` and `IMonitorManager`.
 
 #### 8.2 Windows Monitor Implementation
 
-Implement monitor enumeration using `EnumDisplayMonitors` Win32 API.
+Implemented `src/platform/windows/monitor_manager_win.hpp/.cpp` using `EnumDisplayMonitors`, a message-only window, and change notifications to keep monitor data fresh.
+
+#### 8.3 Overlay Integration
+
+- Added `OverlayManager` support for multiple overlays (one per monitor).
+- Positioned overlays using monitor bounds and full-screen sizing.
+- Wired `show_on_all_monitors` from configuration via `AppController`.
+
+#### 8.4 Tests
+
+- Updated config roundtrip test to include `overlay.show_on_all_monitors`.
+- Added UI test covering default `BreakOverlay` properties.
+
+### Validation Results
+
+- `cmake --preset=debug --fresh`
+- `cmake --build --preset=debug`
+- `ctest --preset=debug` (104 tests passed)
+- `build/debug/src/Debug/blinkbreak.exe --version`
 
 ### Deliverables
 
 - [x] MonitorManager interface
 - [x] Windows implementation
-- [x] Multi-overlay support
+- [x] Multi-overlay support with monitor positioning
 - [x] Configuration option for all/primary only
+- [x] Unit/UI tests updated
 
 ---
 
@@ -1293,7 +1294,7 @@ This implementation plan provides a comprehensive 12-stage roadmap for building 
 | 5     | Basic UI          | -           | 82          |
 | 6     | System Tray       | -           | 82          |
 | 7     | Overlay           | -           | 82          |
-| 8     | Multi-Monitor     | -           | 82          |
+| 8     | Multi-Monitor     | 2           | 104         |
 | 9     | Idle Detection    | 5           | 87          |
 | 10    | Notifications     | 3           | 90          |
 | 11    | DND Detection     | 2           | 92          |

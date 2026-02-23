@@ -31,6 +31,20 @@ TEST(OverlayUiTest, PropertiesRoundTrip) {
     EXPECT_FLOAT_EQ(overlay->get_overlay_opacity(), 0.55f);
 }
 
+/// @test Verifies default overlay properties.
+/// @details Confirms default values match the Slint component defaults.
+TEST(OverlayUiTest, DefaultPropertiesAreAvailable) {
+    auto overlay = BreakOverlay::create();
+
+    EXPECT_EQ(ToStdString(overlay->get_message()), "Take a break!");
+    EXPECT_EQ(ToStdString(overlay->get_time_remaining()), "00:20");
+    EXPECT_EQ(ToStdString(overlay->get_break_type()), "Short");
+    EXPECT_TRUE(overlay->get_can_skip());
+    EXPECT_TRUE(overlay->get_can_snooze());
+    EXPECT_EQ(ToStdString(overlay->get_snooze_label()), "Snooze (5 min)");
+    EXPECT_FLOAT_EQ(overlay->get_overlay_opacity(), 0.7f);
+}
+
 /// @test Verifies skip and snooze callbacks invoke.
 /// @details Ensures both callbacks fire once when invoked.
 TEST(OverlayUiTest, SkipAndSnoozeCallbacksInvoke) {
@@ -47,6 +61,24 @@ TEST(OverlayUiTest, SkipAndSnoozeCallbacksInvoke) {
 
     EXPECT_EQ(skip_spy.count, 1);
     EXPECT_EQ(snooze_spy.count, 1);
+}
+
+/// @test Verifies multiple overlay instances are independent.
+/// @details Ensures separate instances keep their own property values.
+TEST(OverlayUiTest, MultipleInstancesAreIndependent) {
+    auto overlay_a = BreakOverlay::create();
+    auto overlay_b = BreakOverlay::create();
+
+    overlay_a->set_message("Hydrate");
+    overlay_b->set_message("Blink");
+
+    overlay_a->set_time_remaining("00:15");
+    overlay_b->set_time_remaining("01:00");
+
+    EXPECT_EQ(ToStdString(overlay_a->get_message()), "Hydrate");
+    EXPECT_EQ(ToStdString(overlay_b->get_message()), "Blink");
+    EXPECT_EQ(ToStdString(overlay_a->get_time_remaining()), "00:15");
+    EXPECT_EQ(ToStdString(overlay_b->get_time_remaining()), "01:00");
 }
 
 }  // namespace

@@ -69,6 +69,12 @@ A lightweight, cross-platform eye strain prevention application.
   - `BreakOverlay` Slint file with dimming, message, and countdown
   - `OverlayManager` wiring for show/hide and actions
   - UI + unit tests added for overlay and break countdown
+- Stage 8 (Multi-Monitor Support): complete
+  - Monitor manager interface + Windows implementation
+  - `OverlayManager` supports one overlay per monitor or primary-only mode
+  - `overlay.show_on_all_monitors` wired from config to overlay behavior
+  - Tests added for config round-trip, overlay defaults, and overlay manager monitor changes
+  - Validation: previously `cmake --preset=debug --fresh`, `cmake --build --preset=debug`, `ctest --preset=debug` (104 tests passed); re-run pending after overlay manager unit tests
 
 ## Building
 

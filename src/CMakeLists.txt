@@ -59,6 +59,13 @@ if(NOT TARGET blinkbreak_ui)
             blinkbreak_platform
             Slint::Slint
     )
+    if(WIN32)
+        target_link_libraries(blinkbreak_ui
+            PRIVATE
+                User32
+                Shcore
+        )
+    endif()
     target_compile_definitions(blinkbreak_ui
         PRIVATE
             _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING

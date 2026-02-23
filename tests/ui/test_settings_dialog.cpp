@@ -20,6 +20,7 @@ TEST(SettingsDialogUiTest, DefaultValuesAreAvailable) {
     EXPECT_EQ(ToStdString(dialog->get_long_interval_minutes()), "60");
     EXPECT_EQ(ToStdString(dialog->get_long_duration_seconds()), "300");
     EXPECT_EQ(ToStdString(dialog->get_snooze_duration_minutes()), "5");
+    EXPECT_TRUE(dialog->get_show_on_all_monitors());
     EXPECT_EQ(ToStdString(dialog->get_validation_error()), "");
     EXPECT_FALSE(dialog->get_has_validation_error());
 }
@@ -35,12 +36,14 @@ TEST(SettingsDialogUiTest, ValuesRoundTrip) {
     dialog->set_long_interval_minutes("90");
     dialog->set_long_duration_seconds("600");
     dialog->set_snooze_duration_minutes("7");
+    dialog->set_show_on_all_monitors(false);
 
     EXPECT_EQ(ToStdString(dialog->get_short_interval_minutes()), "15");
     EXPECT_EQ(ToStdString(dialog->get_short_duration_seconds()), "30");
     EXPECT_EQ(ToStdString(dialog->get_long_interval_minutes()), "90");
     EXPECT_EQ(ToStdString(dialog->get_long_duration_seconds()), "600");
     EXPECT_EQ(ToStdString(dialog->get_snooze_duration_minutes()), "7");
+    EXPECT_FALSE(dialog->get_show_on_all_monitors());
 }
 
 /// @test Verifies validation error toggles the error flag.

@@ -156,6 +156,7 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     auto original = ConfigManager::GetDefault();
     original.short_break.interval = 123s;
     original.overlay.opacity = 0.5f;
+    original.overlay.show_on_all_monitors = false;
 
     std::string json = config_manager_->ToJson(original);
     auto parsed = config_manager_->ParseJson(json);
@@ -163,6 +164,7 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     ASSERT_TRUE(parsed.has_value());
     EXPECT_EQ(parsed->short_break.interval, 123s);
     EXPECT_FLOAT_EQ(parsed->overlay.opacity, 0.5f);
+    EXPECT_FALSE(parsed->overlay.show_on_all_monitors);
 }
 
 // ============================================================================

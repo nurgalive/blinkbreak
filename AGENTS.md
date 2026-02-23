@@ -998,6 +998,10 @@ Implemented `src/platform/windows/monitor_manager_win.hpp/.cpp` using `EnumDispl
 - [x] Configuration option for all/primary only
 - [x] Unit/UI tests updated
 
+### Issues
+
+Current implementation has issues with correctly showing overlay on portrain monitors with GPU acceleration. It works fine on landscape monitors. Using `software-renderer` fixes the issue but it is slower.
+
 ---
 
 ## Stage 9: Idle Detection

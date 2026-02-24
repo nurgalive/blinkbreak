@@ -1,0 +1,11 @@
+// blinkbreak.rc — Windows resource script for BlinkBreak icons.
+//
+// The ICO files are generated from SVG sources by scripts/convert_icons.py
+// during the CMake build (add_custom_command).
+
+#include "resource.h"
+
+// IDI_APP_BLUE is listed first so the Windows shell picks it as the
+// default executable / taskbar icon.
+IDI_APP_BLUE   ICON "bb_logo_blue.ico"
+IDI_APP_YELLOW ICON "bb_logo_yellow.ico"

@@ -69,6 +69,10 @@ A lightweight, cross-platform eye strain prevention application.
   - `BreakOverlay` Slint file with dimming, message, and countdown
   - `OverlayManager` wiring for show/hide and actions
   - UI + unit tests added for overlay and break countdown
+- Stage 7B (Stability & Asset Pipeline): complete
+  - Fixed Slint cross-thread UI update memory-graph panics using `ComponentWeakHandle`
+  - Re-wrote SVG icon pipeline using `sharp` and manual ICO packing for crisp taskbar visuals
+  - Added script documentation and optimized git tracking
 
 ## Building
 

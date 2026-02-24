@@ -102,6 +102,10 @@
       - [7.2 Create Overlay Manager](#72-create-overlay-manager)
     - [Test Requirements](#test-requirements-6)
     - [Deliverables](#deliverables-6)
+  - [Stage 7B: Stability \& Asset Pipeline](#stage-7b-stability--asset-pipeline)
+    - [Goal (7B)](#goal-7b)
+    - [Implementation Steps (7B)](#implementation-steps-7b)
+    - [Deliverables (7B)](#deliverables-7b)
   - [Stage 8: Multi-Monitor Support](#stage-8-multi-monitor-support)
     - [Goal](#goal-7)
     - [Prerequisites](#prerequisites-7)
@@ -952,6 +956,27 @@ Create `src/ui/overlay_manager.hpp` and `overlay_manager.cpp` for managing overl
 
 ---
 
+## Stage 7B: Stability & Asset Pipeline
+
+### Goal (7B)
+
+Address threading panics in Slint UI updates across thread boundaries and improve the application's icon generation pipeline for crisp display.
+
+### Implementation Steps (7B)
+
+- **Thread-safe Updates:** Fixed an issue where capturing `slint::ComponentHandle` and allocating Slint strings in the background timer thread caused memory-graph panics. Shifted to capturing `slint::ComponentWeakHandle` and native C++ `std::string` objects across the boundary, subsequently resolving them into Slint-specific UI structures strictly within the main-thread `slint::invoke_from_event_loop`.
+- **High-Resolution Icon Pipeline:** Re-wrote `convert_icons.py` to leverage Node.js and `sharp` for pixel-perfect SVG rasterization. Bypassed Pillow's ICO downscaling visual artifacts by manually packing the raw PNG buffers into the final multi-resolution `.ico` format. Explicitly assigned `icon` properties within the `.slint` window descriptors to instruct the OS to use crisp assets.
+- **Documentation & Environment:** Created `scripts/README.md` to explain the SVG-to-ICO strategy (including manual `npm install` instructions) and appended `node_modules/` to `.gitignore`.
+
+### Deliverables (7B)
+
+- [x] Stable `AppController` multi-threading without Slint graph panics
+- [x] Crisp `bb_logo_blue.ico` generated via manual PNG-to-ICO packing and `sharp`
+- [x] Slint files updated to use `@image-url(...)` for the window icon mapping
+- [x] Script documentation (`scripts/README.md`) built and Node environment properly configured
+
+---
+
 ## Stage 8: Multi-Monitor Support
 
 ### Goal
@@ -1293,6 +1318,7 @@ This implementation plan provides a comprehensive 12-stage roadmap for building 
 | 5     | Basic UI          | -           | 82          |
 | 6     | System Tray       | -           | 82          |
 | 7     | Overlay           | -           | 82          |
+| 7B    | Stability/Assets  | -           | 82          |
 | 8     | Multi-Monitor     | -           | 82          |
 | 9     | Idle Detection    | 5           | 87          |
 | 10    | Notifications     | 3           | 90          |

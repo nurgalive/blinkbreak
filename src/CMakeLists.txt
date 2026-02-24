@@ -74,9 +74,47 @@ if(NOT TARGET blinkbreak_ui)
     )
 endif()
 
+# ---------------------------------------------------------------------------
+# Icon conversion: SVG -> ICO (multi-resolution)
+# ---------------------------------------------------------------------------
+set(ICON_SCRIPT "${PROJECT_SOURCE_DIR}/scripts/convert_icons.py")
+set(ICON_SVG_BLUE   "${PROJECT_SOURCE_DIR}/resources/bb_logo_notext.svg")
+set(ICON_SVG_YELLOW "${PROJECT_SOURCE_DIR}/resources/bb_logo_notext_yellow.svg")
+set(ICON_ICO_BLUE   "${PROJECT_SOURCE_DIR}/resources/bb_logo_blue.ico")
+set(ICON_ICO_YELLOW "${PROJECT_SOURCE_DIR}/resources/bb_logo_yellow.ico")
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+add_custom_command(
+    OUTPUT  ${ICON_ICO_BLUE} ${ICON_ICO_YELLOW}
+    COMMAND ${Python3_EXECUTABLE} ${ICON_SCRIPT}
+            ${ICON_SVG_BLUE}   ${ICON_ICO_BLUE}
+            ${ICON_SVG_YELLOW} ${ICON_ICO_YELLOW}
+    DEPENDS ${ICON_SVG_BLUE} ${ICON_SVG_YELLOW} ${ICON_SCRIPT}
+    COMMENT "Converting SVG icons to ICO (16/32/48/256)"
+    VERBATIM
+)
+
+add_custom_target(blinkbreak_icons DEPENDS ${ICON_ICO_BLUE} ${ICON_ICO_YELLOW})
+
+# ---------------------------------------------------------------------------
+# Windows resource file (.rc) — embeds the ICO files into the executable
+# ---------------------------------------------------------------------------
+if(WIN32)
+    set(BLINKBREAK_RC "${PROJECT_SOURCE_DIR}/resources/blinkbreak.rc")
+endif()
+
 # Main executable
 if(NOT TARGET blinkbreak)
-    add_executable(blinkbreak main.cpp)
+    add_executable(blinkbreak
+        main.cpp
+        $<$<BOOL:${WIN32}>:${BLINKBREAK_RC}>
+    )
+    add_dependencies(blinkbreak blinkbreak_icons)
+    target_include_directories(blinkbreak
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/resources
+    )
     target_link_libraries(blinkbreak
         PRIVATE
             blinkbreak_ui

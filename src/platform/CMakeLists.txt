@@ -20,6 +20,7 @@ target_include_directories(blinkbreak_platform
     PUBLIC
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/resources
 )
 
 target_link_libraries(blinkbreak_platform

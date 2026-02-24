@@ -1,0 +1,79 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake: Configure Debug",
+            "type": "shell",
+            "command": "cmake --preset=debug",
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Configure the project using the debug preset"
+        },
+        {
+            "label": "CMake: Fresh Configure Debug",
+            "type": "shell",
+            "command": "cmake --preset=debug --fresh",
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Fresh configure (re-run all checks) using the debug preset"
+        },
+        {
+            "label": "CMake: Build Debug",
+            "type": "shell",
+            "command": "cmake --build --preset=debug",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build the project using the debug preset"
+        },
+        {
+            "label": "CMake: Run All Tests",
+            "type": "shell",
+            "command": "ctest --preset=debug",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run all tests using the debug preset"
+        },
+        {
+            "label": "CMake: Run All Tests (Verbose)",
+            "type": "shell",
+            "command": "ctest --preset=debug --output-on-failure -V",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run all tests verbosely with output on failure"
+        },
+        {
+            "label": "CMake: Run UI Tests",
+            "type": "shell",
+            "command": "ctest --preset=debug -L ui",
+            "problemMatcher": [],
+            "group": "test",
+            "detail": "Run only UI tests (Slint components)"
+        },
+        {
+            "label": "CMake: Build and Run Tests",
+            "type": "shell",
+            "command": "cmake --preset=debug --fresh; if ($?) { cmake --build --preset=debug }; if ($?) { ctest --preset=debug }",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "detail": "Fresh configure, build the project, and then run all tests"
+        },
+        {
+            "label": "CMake: Clean",
+            "type": "shell",
+            "command": "cmake --build --preset=debug --target clean",
+            "problemMatcher": [],
+            "group": "build",
+            "detail": "Clean the build directory"
+        }
+    ]
+}

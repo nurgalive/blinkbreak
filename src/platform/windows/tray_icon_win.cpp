@@ -1,74 +1,43 @@
 /// @file tray_icon_win.cpp
 /// @brief Windows-specific system tray icon implementation.
+///
+/// Icons are loaded from embedded Win32 resources (see resources/blinkbreak.rc).
+/// NOTIFYICON_VERSION_4 is used for Windows 7+ compatibility.
+/// Tray icon size is determined at runtime via GetSystemMetrics(SM_CXSMICON).
 
 #ifdef _WIN32
 
-#include "tray_icon_win.hpp"
+    #include "tray_icon_win.hpp"
 
-#include <spdlog/spdlog.h>
+    #include "../resources/resource.h"
+    #include <spdlog/spdlog.h>
 
-namespace {
-
-constexpr DWORD kGreenInner = 0xFF4CAF50;
-constexpr DWORD kGreenOuter = 0xFF2E7D32;
-constexpr DWORD kYellowInner = 0xFFFBC02D;
-constexpr DWORD kYellowOuter = 0xFFF9A825;
-
-HICON CreateSimpleIconWithColors(DWORD inner_color, DWORD outer_color) {
-    const int size = 16;
-    HDC hdc = GetDC(nullptr);
-    HDC memDC = CreateCompatibleDC(hdc);
-
-    BITMAPINFO bmi = {};
-    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bmi.bmiHeader.biWidth = size;
-    bmi.bmiHeader.biHeight = size;
-    bmi.bmiHeader.biPlanes = 1;
-    bmi.bmiHeader.biBitCount = 32;
-    bmi.bmiHeader.biCompression = BI_RGB;
-
-    void* bits = nullptr;
-    HBITMAP hbm = CreateDIBSection(memDC, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
-    HBITMAP hbmMask = CreateBitmap(size, size, 1, 1, nullptr);
-
-    if (hbm && bits) {
-        auto* pixels = static_cast<DWORD*>(bits);
-        for (int y = 0; y < size; ++y) {
-            for (int x = 0; x < size; ++x) {
-                int dx = x - size / 2;
-                int dy = y - size / 2;
-                int dist = dx * dx + dy * dy;
-
-                if (dist < 36) {
-                    pixels[y * size + x] = inner_color;
-                } else if (dist < 64) {
-                    pixels[y * size + x] = outer_color;
-                } else {
-                    pixels[y * size + x] = 0x00000000;
-                }
-            }
-        }
-    }
-
-    ICONINFO ii = {};
-    ii.fIcon = TRUE;
-    ii.hbmMask = hbmMask;
-    ii.hbmColor = hbm;
-
-    HICON hIcon = CreateIconIndirect(&ii);
-
-    DeleteObject(hbm);
-    DeleteObject(hbmMask);
-    DeleteDC(memDC);
-    ReleaseDC(nullptr, hdc);
-
-    return hIcon;
-}
-
-}  // namespace
 
 namespace blinkbreak {
 namespace platform {
+
+// ---------------------------------------------------------------------------
+// Helper: load an icon resource at the system's small-icon size
+// ---------------------------------------------------------------------------
+
+HICON TrayIconWin::LoadIconResource(int resource_id) {
+    const int cx = GetSystemMetrics(SM_CXSMICON);
+    const int cy = GetSystemMetrics(SM_CYSMICON);
+
+    HICON icon =
+        static_cast<HICON>(LoadImageW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resource_id),
+                                      IMAGE_ICON, cx, cy, LR_DEFAULTCOLOR));
+
+    if (!icon) {
+        spdlog::warn("LoadImageW failed for resource id {} ({}x{}), error={}", resource_id, cx, cy,
+                     GetLastError());
+    }
+    return icon;
+}
+
+// ---------------------------------------------------------------------------
+// Construction / destruction
+// ---------------------------------------------------------------------------
 
 TrayIconWin::TrayIconWin()
     : hwnd_(nullptr),
@@ -87,11 +56,12 @@ TrayIconWin::TrayIconWin()
     RegisterClassExW(&wc);
 
     // Create hidden window
-    hwnd_ = CreateWindowExW(
-        0, L"BlinkBreakTrayClass", L"BlinkBreak",
-        0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
-        GetModuleHandle(nullptr), nullptr
-    );
+    hwnd_ = CreateWindowExW(0, L"BlinkBreakTrayClass", L"BlinkBreak", 0, 0, 0, 0, 0, HWND_MESSAGE,
+                            nullptr, GetModuleHandle(nullptr), nullptr);
+
+    // Load icons from embedded resources
+    icon_running_ = LoadIconResource(IDI_APP_BLUE);
+    icon_paused_ = LoadIconResource(IDI_APP_YELLOW);
 
     // Initialize tray icon data
     ZeroMemory(&nid_, sizeof(nid_));
@@ -100,8 +70,7 @@ TrayIconWin::TrayIconWin()
     nid_.uID = 1;
     nid_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid_.uCallbackMessage = kWmTrayIcon;
-    icon_running_ = CreateSimpleIconWithColors(kGreenInner, kGreenOuter);
-    icon_paused_ = CreateSimpleIconWithColors(kYellowInner, kYellowOuter);
+    nid_.uVersion = NOTIFYICON_VERSION_4;
     nid_.hIcon = icon_paused_ ? icon_paused_ : icon_running_;
     wcscpy_s(nid_.szTip, L"BlinkBreak");
 
@@ -129,12 +98,18 @@ TrayIconWin::~TrayIconWin() {
     spdlog::debug("TrayIconWin destroyed");
 }
 
+// ---------------------------------------------------------------------------
+// Public interface
+// ---------------------------------------------------------------------------
+
 bool TrayIconWin::Show() {
     if (is_visible_) {
         return true;
     }
 
     if (Shell_NotifyIconW(NIM_ADD, &nid_)) {
+        // Request NOTIFYICON_VERSION_4 behaviour
+        Shell_NotifyIconW(NIM_SETVERSION, &nid_);
         is_visible_ = true;
         spdlog::info("Tray icon shown");
         return true;
@@ -178,8 +153,10 @@ void TrayIconWin::SetMenu(const std::vector<MenuItem>& items) {
         } else {
             std::wstring wide_text(item.text.begin(), item.text.end());
             UINT flags = MF_STRING;
-            if (!item.enabled) flags |= MF_GRAYED;
-            if (item.checked) flags |= MF_CHECKED;
+            if (!item.enabled)
+                flags |= MF_GRAYED;
+            if (item.checked)
+                flags |= MF_CHECKED;
             AppendMenuW(hmenu_, flags, i + 1, wide_text.c_str());
         }
     }
@@ -211,6 +188,10 @@ void TrayIconWin::SetIcon(int icon_id) {
         Shell_NotifyIconW(NIM_MODIFY, &nid_);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Window procedure
+// ---------------------------------------------------------------------------
 
 LRESULT CALLBACK TrayIconWin::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     if (msg == kWmTrayIcon && instance_) {
@@ -247,23 +228,21 @@ LRESULT CALLBACK TrayIconWin::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM
 }
 
 void TrayIconWin::ShowContextMenu() {
-    if (!hmenu_) return;
+    if (!hmenu_)
+        return;
 
     POINT pt;
     GetCursorPos(&pt);
 
     SetForegroundWindow(hwnd_);
-    TrackPopupMenu(hmenu_, TPM_RIGHTALIGN | TPM_BOTTOMALIGN,
-                   pt.x, pt.y, 0, hwnd_, nullptr);
+    TrackPopupMenu(hmenu_, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd_, nullptr);
     PostMessage(hwnd_, WM_NULL, 0, 0);
 }
 
-HICON TrayIconWin::CreateSimpleIcon(COLORREF inner_color, COLORREF outer_color) {
-    return CreateSimpleIconWithColors(static_cast<DWORD>(inner_color),
-                                      static_cast<DWORD>(outer_color));
-}
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
 
-// Factory function
 std::unique_ptr<ITrayIcon> CreateTrayIcon() {
     return std::make_unique<TrayIconWin>();
 }

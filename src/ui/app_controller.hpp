@@ -4,12 +4,6 @@
 #ifndef BLINKBREAK_UI_APP_CONTROLLER_HPP
 #define BLINKBREAK_UI_APP_CONTROLLER_HPP
 
-#include "core/break_scheduler.hpp"
-#include "core/config_manager.hpp"
-#include "core/state_machine.hpp"
-#include "overlay_manager.hpp"
-#include "tray_manager.hpp"
-
 #include <atomic>
 #include <filesystem>
 #include <memory>
@@ -17,11 +11,21 @@
 #include <string>
 #include <thread>
 
+#include "core/break_scheduler.hpp"
+#include "core/config_manager.hpp"
+#include "core/state_machine.hpp"
+#include "overlay_manager.hpp"
+#include "tray_manager.hpp"
+
+
 // Forward declaration of Slint generated types
 namespace slint {
 template <typename T>
 class ComponentHandle;
-}
+
+template <typename T>
+class ComponentWeakHandle;
+}  // namespace slint
 
 class MainWindow;
 class SettingsDialog;
@@ -141,6 +145,7 @@ private:
     std::filesystem::path config_path_;
 
     std::unique_ptr<slint::ComponentHandle<MainWindow>> main_window_;
+    std::unique_ptr<slint::ComponentWeakHandle<MainWindow>> main_window_weak_;
     std::unique_ptr<slint::ComponentHandle<SettingsDialog>> settings_dialog_;
 
     std::thread timer_thread_;

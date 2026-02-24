@@ -3,18 +3,17 @@
 
 #include "app_controller.hpp"
 
-#include "main_window.h"
-#include "tray_manager.hpp"
-
-#include <slint.h>
-#include <spdlog/spdlog.h>
-
 #include <chrono>
 #include <cstdlib>
 #include <format>
 #include <limits>
 #include <optional>
+#include <slint.h>
+#include <spdlog/spdlog.h>
 #include <thread>
+
+#include "main_window.h"
+#include "tray_manager.hpp"
 
 namespace blinkbreak {
 
@@ -41,7 +40,6 @@ std::optional<int> ParsePositiveInt(const std::string& text) {
 
     return static_cast<int>(value);
 }
-
 
 }  // namespace
 
@@ -95,13 +93,11 @@ bool AppController::Initialize() {
     }
 
     spdlog::info(
-        "Configured breaks: short[enabled={}, interval={}s, duration={}s] long[enabled={}, interval={}s, duration={}s]",
-        config_.short_break.enabled,
-        config_.short_break.interval.count(),
-        config_.short_break.duration.count(),
-        config_.long_break.enabled,
-        config_.long_break.interval.count(),
-        config_.long_break.duration.count());
+        "Configured breaks: short[enabled={}, interval={}s, duration={}s] long[enabled={}, "
+        "interval={}s, duration={}s]",
+        config_.short_break.enabled, config_.short_break.interval.count(),
+        config_.short_break.duration.count(), config_.long_break.enabled,
+        config_.long_break.interval.count(), config_.long_break.duration.count());
 
     // Create state machine
     state_machine_ = std::make_unique<StateMachine>();
@@ -112,8 +108,8 @@ bool AppController::Initialize() {
     });
 
     // Create break scheduler
-    scheduler_ = std::make_unique<BreakScheduler>(config_.short_break, config_.long_break,
-                                                  config_.overlay);
+    scheduler_ =
+        std::make_unique<BreakScheduler>(config_.short_break, config_.long_break, config_.overlay);
 
     // Create overlay manager
     overlay_manager_ = std::make_unique<OverlayManager>();
@@ -203,12 +199,13 @@ bool AppController::Initialize() {
     is_running_ = false;
 
     main_window_ = std::make_unique<slint::ComponentHandle<MainWindow>>(MainWindow::create());
+    main_window_weak_ = std::make_unique<slint::ComponentWeakHandle<MainWindow>>(*main_window_);
     auto& ui = *main_window_;
 
     ui->on_start_clicked([this] { OnStart(); });
     ui->on_pause_clicked([this] { OnPause(); });
     ui->on_settings_clicked([this] { OnOpenSettings(); });
-    
+
     // Handle window close - hide to tray instead of minimizing/quitting
     ui->window().on_close_requested([this]() {
         spdlog::debug("Window close requested - hiding to tray");
@@ -232,35 +229,39 @@ bool AppController::Initialize() {
 
     // Initialize tray manager
     TrayManager::Callbacks tray_callbacks{
-        .on_show_window = [this]() {
-            spdlog::debug("Tray: Show window");
-            if (main_window_) {
-                (*main_window_)->show();
-                (*main_window_)->window().set_minimized(false);
-            }
-        },
-        .on_start_pause = [this]() {
-            spdlog::debug("Tray: Start/Pause");
-            if (state_machine_->GetCurrentState() == State::kRunning ||
-                state_machine_->GetCurrentState() == State::kSnoozed) {
-                OnPause();
-            } else {
-                OnStart();
-            }
-        },
-        .on_skip = [this]() {
-            spdlog::debug("Tray: Skip");
-            OnSkip();
-        },
-        .on_settings = [this]() {
-            spdlog::debug("Tray: Settings");
-            OnOpenSettings();
-        },
-        .on_quit = [this]() {
-            spdlog::debug("Tray: Quit");
-            OnQuit();
-        }
-    };
+        .on_show_window =
+            [this]() {
+                spdlog::debug("Tray: Show window");
+                if (main_window_) {
+                    (*main_window_)->show();
+                    (*main_window_)->window().set_minimized(false);
+                }
+            },
+        .on_start_pause =
+            [this]() {
+                spdlog::debug("Tray: Start/Pause");
+                if (state_machine_->GetCurrentState() == State::kRunning ||
+                    state_machine_->GetCurrentState() == State::kSnoozed) {
+                    OnPause();
+                } else {
+                    OnStart();
+                }
+            },
+        .on_skip =
+            [this]() {
+                spdlog::debug("Tray: Skip");
+                OnSkip();
+            },
+        .on_settings =
+            [this]() {
+                spdlog::debug("Tray: Settings");
+                OnOpenSettings();
+            },
+        .on_quit =
+            [this]() {
+                spdlog::debug("Tray: Quit");
+                OnQuit();
+            }};
 
     tray_manager_ = std::make_unique<TrayManager>(std::move(tray_callbacks));
     tray_manager_->Show();
@@ -321,7 +322,6 @@ void AppController::OnStart() {
         return;
     }
 
-
     auto result = state_machine_->ProcessEvent(StartEvent{});
     if (result.success) {
         {
@@ -338,8 +338,6 @@ void AppController::OnStart() {
 
 void AppController::OnPause() {
     spdlog::debug("OnPause called");
-
-
 
     auto result = state_machine_->ProcessEvent(PauseEvent{});
     if (result.success) {
@@ -430,16 +428,11 @@ void AppController::OnOpenSettings() {
             auto& dialog = *settings_dialog_;
             dialog->set_validation_error(slint::SharedString(""));
 
-            const auto short_interval_text =
-                ToStdString(dialog->get_short_interval_minutes());
-            const auto short_duration_text =
-                ToStdString(dialog->get_short_duration_seconds());
-            const auto long_interval_text =
-                ToStdString(dialog->get_long_interval_minutes());
-            const auto long_duration_text =
-                ToStdString(dialog->get_long_duration_seconds());
-            const auto snooze_duration_text =
-                ToStdString(dialog->get_snooze_duration_minutes());
+            const auto short_interval_text = ToStdString(dialog->get_short_interval_minutes());
+            const auto short_duration_text = ToStdString(dialog->get_short_duration_seconds());
+            const auto long_interval_text = ToStdString(dialog->get_long_interval_minutes());
+            const auto long_duration_text = ToStdString(dialog->get_long_duration_seconds());
+            const auto snooze_duration_text = ToStdString(dialog->get_snooze_duration_minutes());
 
             const auto short_interval_minutes = ParsePositiveInt(short_interval_text);
             const auto short_duration_seconds = ParsePositiveInt(short_duration_text);
@@ -447,9 +440,8 @@ void AppController::OnOpenSettings() {
             const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
             const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
 
-            if (!short_interval_minutes || !short_duration_seconds ||
-                !long_interval_minutes || !long_duration_seconds ||
-                !snooze_duration_minutes) {
+            if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
+                !long_duration_seconds || !snooze_duration_minutes) {
                 dialog->set_validation_error(
                     slint::SharedString("All fields must be positive integers."));
                 return;
@@ -475,8 +467,7 @@ void AppController::OnOpenSettings() {
             if (config_manager_) {
                 auto save_result = config_manager_->Save(updated, config_path_);
                 if (!save_result) {
-                    dialog->set_validation_error(
-                        slint::SharedString(save_result.error().message));
+                    dialog->set_validation_error(slint::SharedString(save_result.error().message));
                     return;
                 }
             }
@@ -537,21 +528,16 @@ void AppController::OnOpenSettings() {
         std::lock_guard lock(mutex_);
         snapshot = config_;
     }
-    dialog->set_short_interval_minutes(
-        slint::SharedString(std::to_string(
-            static_cast<int>(snapshot.short_break.interval.count() / 60))));
-    dialog->set_short_duration_seconds(
-        slint::SharedString(std::to_string(
-            static_cast<int>(snapshot.short_break.duration.count()))));
-    dialog->set_long_interval_minutes(
-        slint::SharedString(std::to_string(
-            static_cast<int>(snapshot.long_break.interval.count() / 60))));
-    dialog->set_long_duration_seconds(
-        slint::SharedString(std::to_string(
-            static_cast<int>(snapshot.long_break.duration.count()))));
-    dialog->set_snooze_duration_minutes(
-        slint::SharedString(std::to_string(
-            static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
+    dialog->set_short_interval_minutes(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.short_break.interval.count() / 60))));
+    dialog->set_short_duration_seconds(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.short_break.duration.count()))));
+    dialog->set_long_interval_minutes(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.long_break.interval.count() / 60))));
+    dialog->set_long_duration_seconds(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.long_break.duration.count()))));
+    dialog->set_snooze_duration_minutes(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
     dialog->set_validation_error(slint::SharedString(""));
 
     dialog->show();
@@ -559,22 +545,25 @@ void AppController::OnOpenSettings() {
 
 void AppController::OnQuit() {
     spdlog::info("Quit requested");
-    
+
     running_.store(false);
-    
-    if (main_window_) {
-        slint::invoke_from_event_loop([ui = *main_window_]() mutable {
-            ui->hide();
+
+    if (main_window_weak_) {
+        auto ui_weak = *main_window_weak_;
+        slint::invoke_from_event_loop([ui_weak]() mutable {
+            if (auto ui = ui_weak.lock()) {
+                (*ui)->hide();
+            }
         });
     }
-    
+
     if (tray_manager_) {
         tray_manager_->Hide();
     }
     if (overlay_manager_) {
         overlay_manager_->Hide();
     }
-    
+
     slint::quit_event_loop();
 }
 
@@ -654,8 +643,7 @@ void AppController::TimerThreadFunc() {
             std::lock_guard lock(mutex_);
             if (should_track) {
                 tracked_duration_ms_ += delta;
-                tracked_duration_ =
-                    std::chrono::duration_cast<Duration>(tracked_duration_ms_);
+                tracked_duration_ = std::chrono::duration_cast<Duration>(tracked_duration_ms_);
                 tracked_time_ = FormatDuration(tracked_duration_);
             }
         }
@@ -703,18 +691,16 @@ void AppController::UpdateUI() {
         if (time_until_short_opt) {
             const auto short_total = scheduler_->GetShortIntervalTotal();
             if (short_total.count() > 0) {
-                short_progress_ =
-                    1.0f - (static_cast<float>(time_until_short_opt->count()) /
-                            static_cast<float>(short_total.count()));
+                short_progress_ = 1.0f - (static_cast<float>(time_until_short_opt->count()) /
+                                          static_cast<float>(short_total.count()));
             }
         }
 
         if (time_until_long_opt) {
             const auto long_total = scheduler_->GetLongIntervalTotal();
             if (long_total.count() > 0) {
-                long_progress_ =
-                    1.0f - (static_cast<float>(time_until_long_opt->count()) /
-                            static_cast<float>(long_total.count()));
+                long_progress_ = 1.0f - (static_cast<float>(time_until_long_opt->count()) /
+                                         static_cast<float>(long_total.count()));
             }
         }
 
@@ -760,34 +746,28 @@ void AppController::UpdateUI() {
         }
     }
 
-    if (!main_window_) {
+    if (!main_window_weak_) {
         return;
     }
 
-    auto ui_handle = *main_window_;
-    slint::invoke_from_event_loop([ui_handle,
-                                   time_until_short = slint::SharedString(time_until_short),
-                                   time_until_long = slint::SharedString(time_until_long),
-                                   tracked_time = slint::SharedString(tracked_time),
-                                   status_text = slint::SharedString(status_text),
-                                   short_progress,
-                                   long_progress,
-                                   short_break_count,
-                                   long_break_count,
-                                   short_skipped_count,
-                                   long_skipped_count,
+    auto ui_weak = *main_window_weak_;
+    slint::invoke_from_event_loop([ui_weak, time_until_short, time_until_long, tracked_time,
+                                   status_text, short_progress, long_progress, short_break_count,
+                                   long_break_count, short_skipped_count, long_skipped_count,
                                    is_running]() mutable {
-        ui_handle->set_time_until_short(time_until_short);
-        ui_handle->set_time_until_long(time_until_long);
-        ui_handle->set_tracked_time(tracked_time);
-        ui_handle->set_status_text(status_text);
-        ui_handle->set_short_progress(short_progress);
-        ui_handle->set_long_progress(long_progress);
-        ui_handle->set_short_break_count(short_break_count);
-        ui_handle->set_long_break_count(long_break_count);
-        ui_handle->set_short_skipped_count(short_skipped_count);
-        ui_handle->set_long_skipped_count(long_skipped_count);
-        ui_handle->set_is_running(is_running);
+        if (auto ui_handle = ui_weak.lock()) {
+            (*ui_handle)->set_time_until_short(slint::SharedString(time_until_short));
+            (*ui_handle)->set_time_until_long(slint::SharedString(time_until_long));
+            (*ui_handle)->set_tracked_time(slint::SharedString(tracked_time));
+            (*ui_handle)->set_status_text(slint::SharedString(status_text));
+            (*ui_handle)->set_short_progress(short_progress);
+            (*ui_handle)->set_long_progress(long_progress);
+            (*ui_handle)->set_short_break_count(short_break_count);
+            (*ui_handle)->set_long_break_count(long_break_count);
+            (*ui_handle)->set_short_skipped_count(short_skipped_count);
+            (*ui_handle)->set_long_skipped_count(long_skipped_count);
+            (*ui_handle)->set_is_running(is_running);
+        }
     });
 }
 

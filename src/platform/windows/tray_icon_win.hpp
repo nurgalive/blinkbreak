@@ -8,13 +8,17 @@
 
 #ifdef _WIN32
 
-#include <Windows.h>
-#include <shellapi.h>
+    #include <Windows.h>
+    #include <shellapi.h>
 
 namespace blinkbreak {
 namespace platform {
 
 /// @brief Windows implementation of ITrayIcon.
+///
+/// Icons are loaded from Win32 resources embedded via the .rc file.
+/// The tray uses NOTIFYICON_VERSION_4 for Windows 7+ compatibility and
+/// sizes icons with GetSystemMetrics(SM_CXSMICON).
 class TrayIconWin : public ITrayIcon {
 public:
     /// @brief Constructs a Windows tray icon.
@@ -38,22 +42,21 @@ private:
     /// @brief Shows the context menu at cursor position.
     void ShowContextMenu();
 
-    /// @brief Creates a simple icon programmatically.
-    /// @param inner_color Fill color for the inner circle.
-    /// @param outer_color Fill color for the outer ring.
-    /// @return Handle to the created icon.
-    HICON CreateSimpleIcon(COLORREF inner_color, COLORREF outer_color);
+    /// @brief Loads an icon resource at the system-preferred small-icon size.
+    /// @param resource_id  Resource identifier (e.g. IDI_APP_BLUE).
+    /// @return Handle to the loaded icon, or nullptr on failure.
+    static HICON LoadIconResource(int resource_id);
 
-    HWND hwnd_;                             ///< Hidden window for messages.
-    NOTIFYICONDATAW nid_;                   ///< Tray icon data.
-    HMENU hmenu_;                           ///< Context menu handle.
-    std::vector<MenuItem> menu_items_;      ///< Current menu items.
-    std::function<void()> on_click_;        ///< Left-click callback.
-    std::function<void()> on_double_click_; ///< Double-click callback.
-    bool is_visible_;                       ///< Whether icon is visible.
+    HWND hwnd_;                              ///< Hidden window for messages.
+    NOTIFYICONDATAW nid_;                    ///< Tray icon data.
+    HMENU hmenu_;                            ///< Context menu handle.
+    std::vector<MenuItem> menu_items_;       ///< Current menu items.
+    std::function<void()> on_click_;         ///< Left-click callback.
+    std::function<void()> on_double_click_;  ///< Double-click callback.
+    bool is_visible_;                        ///< Whether icon is visible.
 
-    HICON icon_running_;                    ///< Cached icon for running state.
-    HICON icon_paused_;                     ///< Cached icon for paused state.
+    HICON icon_running_;  ///< Cached icon for running state (blue).
+    HICON icon_paused_;   ///< Cached icon for paused state (yellow).
 
     static constexpr UINT kWmTrayIcon = WM_USER + 1;
     static constexpr int kIconPaused = 0;

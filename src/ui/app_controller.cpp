@@ -13,6 +13,7 @@
 #include <thread>
 
 #include "main_window.h"
+#include "platform/platform_interface.hpp"
 #include "tray_manager.hpp"
 
 namespace blinkbreak {
@@ -111,8 +112,13 @@ bool AppController::Initialize() {
     scheduler_ =
         std::make_unique<BreakScheduler>(config_.short_break, config_.long_break, config_.overlay);
 
-    // Create overlay manager
+    // Create monitor manager
+    monitor_manager_ = platform::CreateMonitorManager();
+
+    // Create overlay manager with multi-monitor support
     overlay_manager_ = std::make_unique<OverlayManager>();
+    overlay_manager_->SetMonitorManager(monitor_manager_);
+    overlay_manager_->SetShowOnAllMonitors(config_.overlay.show_on_all_monitors);
     overlay_manager_->SetOnSkip([this] { OnSkip(); });
     overlay_manager_->SetOnSnooze([this] { OnSnooze(); });
     overlay_manager_->UpdateOpacity(config_.overlay.opacity);
@@ -457,6 +463,7 @@ void AppController::OnOpenSettings() {
             updated.long_break.interval = Duration(*long_interval_minutes * 60);
             updated.long_break.duration = Duration(*long_duration_seconds);
             updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
+            updated.overlay.show_on_all_monitors = dialog->get_overlay_all_monitors();
 
             auto errors = config_manager_->Validate(updated);
             if (!errors.empty()) {
@@ -515,6 +522,7 @@ void AppController::OnOpenSettings() {
                 overlay_manager_->UpdateOpacity(updated.overlay.opacity);
                 overlay_manager_->UpdateActions(updated.overlay.allow_skip,
                                                 updated.overlay.allow_snooze);
+                overlay_manager_->SetShowOnAllMonitors(updated.overlay.show_on_all_monitors);
             }
 
             UpdateUI();
@@ -538,6 +546,7 @@ void AppController::OnOpenSettings() {
         std::to_string(static_cast<int>(snapshot.long_break.duration.count()))));
     dialog->set_snooze_duration_minutes(slint::SharedString(
         std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
+    dialog->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
     dialog->set_validation_error(slint::SharedString(""));
 
     dialog->show();

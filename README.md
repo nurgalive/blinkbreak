@@ -73,6 +73,11 @@ A lightweight, cross-platform eye strain prevention application.
   - Fixed Slint cross-thread UI update memory-graph panics using `ComponentWeakHandle`
   - Re-wrote SVG icon pipeline using `sharp` and manual ICO packing for crisp taskbar visuals
   - Added script documentation and optimized git tracking
+- Stage 8 (Multi-Monitor Support): complete
+  - Extended overlay system to optionally display on all connected monitors using physical Win32 geometry
+  - Added `MonitorManagerWin` for precise per-monitor DPI and position logic
+  - Added a configuration toggle to restrict the overlay to the primary monitor
+  - **Note**: Currently, GPU acceleration is not working with portrait monitors
 
 ## Building
 

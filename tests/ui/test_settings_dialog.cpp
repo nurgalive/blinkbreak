@@ -14,7 +14,7 @@ namespace {
 /// and that the validation error state starts cleared.
 TEST(SettingsDialogUiTest, DefaultValuesAreAvailable) {
     auto dialog = SettingsDialog::create();
-    
+
     EXPECT_EQ(ToStdString(dialog->get_short_interval_minutes()), "10");
     EXPECT_EQ(ToStdString(dialog->get_short_duration_seconds()), "20");
     EXPECT_EQ(ToStdString(dialog->get_long_interval_minutes()), "60");
@@ -29,7 +29,7 @@ TEST(SettingsDialogUiTest, DefaultValuesAreAvailable) {
 /// the same values, validating the bindings are functional.
 TEST(SettingsDialogUiTest, ValuesRoundTrip) {
     auto dialog = SettingsDialog::create();
-    
+
     dialog->set_short_interval_minutes("15");
     dialog->set_short_duration_seconds("30");
     dialog->set_long_interval_minutes("90");
@@ -48,7 +48,7 @@ TEST(SettingsDialogUiTest, ValuesRoundTrip) {
 /// sets both the string and the `has-validation-error` property.
 TEST(SettingsDialogUiTest, ValidationErrorUpdatesFlag) {
     auto dialog = SettingsDialog::create();
-    
+
     dialog->set_validation_error("");
     EXPECT_FALSE(dialog->get_has_validation_error());
 
@@ -62,7 +62,7 @@ TEST(SettingsDialogUiTest, ValidationErrorUpdatesFlag) {
 /// when invoked from the test harness.
 TEST(SettingsDialogUiTest, SaveAndCancelCallbacksInvoke) {
     auto dialog = SettingsDialog::create();
-    
+
     CallbackSpy save_spy;
     CallbackSpy cancel_spy;
 
@@ -74,6 +74,23 @@ TEST(SettingsDialogUiTest, SaveAndCancelCallbacksInvoke) {
 
     EXPECT_EQ(save_spy.count, 1);
     EXPECT_EQ(cancel_spy.count, 1);
+}
+
+/// @test Verifies overlay-all-monitors default is true.
+TEST(SettingsDialogUiTest, OverlayAllMonitorsDefaultTrue) {
+    auto dialog = SettingsDialog::create();
+    EXPECT_TRUE(dialog->get_overlay_all_monitors());
+}
+
+/// @test Verifies overlay-all-monitors round-trips.
+TEST(SettingsDialogUiTest, OverlayAllMonitorsRoundTrip) {
+    auto dialog = SettingsDialog::create();
+
+    dialog->set_overlay_all_monitors(false);
+    EXPECT_FALSE(dialog->get_overlay_all_monitors());
+
+    dialog->set_overlay_all_monitors(true);
+    EXPECT_TRUE(dialog->get_overlay_all_monitors());
 }
 
 }  // namespace

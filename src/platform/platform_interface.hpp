@@ -14,11 +14,11 @@ namespace platform {
 
 /// @brief Menu item for system tray context menu.
 struct MenuItem {
-    std::string text;                      ///< Display text.
-    std::function<void()> callback;        ///< Action callback.
-    bool enabled = true;                   ///< Whether item is enabled.
-    bool checked = false;                  ///< Whether item is checked.
-    bool is_separator = false;             ///< Whether this is a separator.
+    std::string text;                ///< Display text.
+    std::function<void()> callback;  ///< Action callback.
+    bool enabled = true;             ///< Whether item is enabled.
+    bool checked = false;            ///< Whether item is checked.
+    bool is_separator = false;       ///< Whether this is a separator.
 };
 
 /// @brief Interface for system tray functionality.
@@ -57,6 +57,75 @@ public:
 /// @brief Creates platform-specific tray icon implementation.
 /// @return Unique pointer to the tray icon implementation.
 std::unique_ptr<ITrayIcon> CreateTrayIcon();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monitor Management
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @brief Display orientation.
+enum class MonitorOrientation {
+    kLandscape,         ///< Normal landscape (0°).
+    kPortrait,          ///< Portrait (90°).
+    kLandscapeFlipped,  ///< Landscape flipped (180°).
+    kPortraitFlipped,   ///< Portrait flipped (270°).
+};
+
+/// @brief Converts a MonitorOrientation to a human-readable string.
+[[nodiscard]] constexpr const char* OrientationToString(MonitorOrientation o) {
+    switch (o) {
+        case MonitorOrientation::kLandscape:
+            return "Landscape";
+        case MonitorOrientation::kPortrait:
+            return "Portrait";
+        case MonitorOrientation::kLandscapeFlipped:
+            return "Landscape (flipped)";
+        case MonitorOrientation::kPortraitFlipped:
+            return "Portrait (flipped)";
+    }
+    return "Unknown";
+}
+
+/// @brief Information about a display monitor.
+struct MonitorInfo {
+    int id = 0;               ///< Monitor identifier (index).
+    std::string name;         ///< Display device name.
+    int x = 0;                ///< Left edge in virtual-screen pixels.
+    int y = 0;                ///< Top edge in virtual-screen pixels.
+    int width = 0;            ///< Width in pixels.
+    int height = 0;           ///< Height in pixels.
+    bool is_primary = false;  ///< Whether this is the primary monitor.
+    MonitorOrientation orientation = MonitorOrientation::kLandscape;
+    unsigned int dpi = 96;  ///< Effective DPI.
+};
+
+/// @brief Interface for monitor management.
+class IMonitorManager {
+public:
+    virtual ~IMonitorManager() = default;
+
+    /// @brief Refreshes the internal monitor list from the OS.
+    virtual void RefreshMonitors() = 0;
+
+    /// @brief Gets all connected monitors.
+    /// @return Vector of MonitorInfo structs.
+    [[nodiscard]] virtual std::vector<MonitorInfo> GetMonitors() const = 0;
+
+    /// @brief Gets the primary monitor.
+    /// @return Primary monitor info.
+    [[nodiscard]] virtual MonitorInfo GetPrimaryMonitor() const = 0;
+
+    /// @brief Gets the number of connected monitors.
+    /// @return Monitor count.
+    [[nodiscard]] virtual int GetMonitorCount() const = 0;
+
+    /// @brief Registers a callback invoked when the monitor configuration changes.
+    /// @param callback The callback (called from any thread).
+    virtual void SetOnMonitorChange(std::function<void()> callback) = 0;
+};
+
+/// @brief Creates platform-specific monitor manager implementation.
+/// @return Unique pointer to the monitor manager implementation.
+std::unique_ptr<IMonitorManager> CreateMonitorManager();
 
 }  // namespace platform
 }  // namespace blinkbreak

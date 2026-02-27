@@ -1,19 +1,33 @@
 /// @file main.cpp
 /// @brief Entry point for BlinkBreak application.
 
-#include "ui/app_controller.hpp"
-
 #include <blinkbreak/version.hpp>
-#include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <iostream>
+#include <spdlog/spdlog.h>
 #include <string>
+
+#include "ui/app_controller.hpp"
 
 /// @brief Main entry point for the application.
 /// @param argc Argument count.
 /// @param argv Argument values.
 /// @return Exit code (0 for success).
 int main(int argc, char* argv[]) {
+    // Force Slint to use the software renderer to avoid the DXGI pre-rotation
+    // bug on portrait monitors. GPU renderers (FemtoVG/wgpu) create a swapchain
+    // sized for logical (rotated) dimensions but don't apply the matching
+    // pre-rotation matrix, causing stretched/misrotated framebuffers on portrait
+    // displays. The software renderer bypasses GPU compositing entirely.
+    // Only set if not already overridden by the user.
+#ifdef _WIN32
+    if (std::getenv("SLINT_BACKEND") == nullptr) {
+        _putenv_s("SLINT_BACKEND", "winit-software");
+    }
+#else
+    ::setenv("SLINT_BACKEND", "winit-software", 0);
+#endif
     // Configure logging
     spdlog::set_level(spdlog::level::debug);
 

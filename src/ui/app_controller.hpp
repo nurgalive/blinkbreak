@@ -17,7 +17,6 @@
 #include "overlay_manager.hpp"
 #include "tray_manager.hpp"
 
-
 // Forward declaration of Slint generated types
 namespace slint {
 template <typename T>
@@ -141,6 +140,7 @@ private:
     std::unique_ptr<BreakScheduler> scheduler_;
     std::unique_ptr<TrayManager> tray_manager_;
     std::unique_ptr<OverlayManager> overlay_manager_;
+    std::shared_ptr<platform::IMonitorManager> monitor_manager_;
     AppConfig config_;
     std::filesystem::path config_path_;
 

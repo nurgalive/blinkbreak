@@ -13,6 +13,8 @@ if(WIN32)
         PRIVATE
             windows/tray_icon_win.hpp
             windows/tray_icon_win.cpp
+            windows/monitor_manager_win.hpp
+            windows/monitor_manager_win.cpp
     )
 endif()
 
@@ -33,6 +35,7 @@ if(WIN32)
     target_link_libraries(blinkbreak_platform
         PRIVATE
             shell32
+            Shcore
     )
 endif()
 

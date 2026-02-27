@@ -982,6 +982,13 @@ Address threading panics in Slint UI updates across thread boundaries and improv
 ### Goal
 
 Extend the overlay system to support multiple monitors with configurable display options.
+- It should support portrait and horizontal orientation
+- It should support primary monitor only or all monitors via config paramter in settings UI.
+
+The correct approach uses one Slint window per monitor, positioned and sized via physical pixel coordinates using slint::Window::set_position() and set_size(), combined with Win32's EnumDisplayMonitors to enumerate displays and query their geometry (including orientation). Slint's set_fullscreen(true) alone is insufficient for multi-monitor scenarios — it only targets the primary display.
+The most important rule: never rely on set_fullscreen(true) alone for multi-monitor — it only targets the primary screen. Always manually set physical position and size from Win32 monitor data before calling set_fullscreen.
+
+**Note:** Currently, GPU acceleration is not working with portrait monitors.
 
 ### Prerequisites
 
@@ -991,36 +998,92 @@ Extend the overlay system to support multiple monitors with configurable display
 
 #### 8.1 Create Monitor Manager Interface
 
-```cpp
-/// @brief Information about a display monitor.
-struct MonitorInfo {
-    int id;                   ///< Monitor identifier.
-    std::string name;         ///< Display name.
-    int x, y;                 ///< Position.
-    int width, height;        ///< Dimensions.
-    bool is_primary;          ///< Whether this is the primary monitor.
-};
+Added `MonitorOrientation` enum (Landscape, Portrait, LandscapeFlipped, PortraitFlipped) and `MonitorInfo` struct with id, name, x/y/width/height, is_primary, orientation, and dpi fields to `src/platform/platform_interface.hpp`.
 
-/// @brief Interface for monitor management.
-class IMonitorManager {
-public:
-    virtual ~IMonitorManager() = default;
-    virtual std::vector<MonitorInfo> GetMonitors() = 0;
-    virtual MonitorInfo GetPrimaryMonitor() = 0;
-    virtual void SetOnMonitorChange(std::function<void()> callback) = 0;
-};
-```
+Added `IMonitorManager` interface with `RefreshMonitors()`, `GetMonitors()`, `GetPrimaryMonitor()`, `GetMonitorCount()`, and `SetOnMonitorChange()` methods.
+
+Added `CreateMonitorManager()` factory function.
+
+Source listing removed. See `src/platform/platform_interface.hpp`.
 
 #### 8.2 Windows Monitor Implementation
 
-Implement monitor enumeration using `EnumDisplayMonitors` Win32 API.
+Implemented `MonitorManagerWin` in `src/platform/windows/monitor_manager_win.hpp/cpp` using:
+- `EnumDisplayMonitors` + `GetMonitorInfoW` for geometry and position
+- `EnumDisplaySettingsW` with `DMDO_DEFAULT/90/180/270` for orientation
+- `GetDpiForMonitor` (Shcore) for per-monitor DPI
+
+Monitors are sorted primary-first and assigned sequential IDs.
+
+Source listing removed. See `src/platform/windows/monitor_manager_win.hpp/cpp`.
+
+#### 8.3 Multi-Monitor Overlay Manager
+
+Rewrote `src/ui/overlay_manager.hpp/cpp` to:
+- Manage a vector of `OverlayInstance` structs (one per target monitor)
+- Accept `IMonitorManager` via `SetMonitorManager()`
+- Support `SetShowOnAllMonitors(bool)` toggle
+- Position each window via `set_position(PhysicalPosition)` and `set_size(PhysicalSize)` from Win32 data
+- Fall back to single fullscreen overlay if no monitor data available
+
+#### 8.4 Settings Dialog Toggle
+
+Added `overlay-all-monitors` property to `ui/components/settings_dialog.slint` with a toggle button ("All Monitors" / "Primary Only").
+
+Wired `AppController` to read/write this toggle from `OverlayConfig.show_on_all_monitors` and persist it via `ConfigManager`.
+
+#### 8.5 AppController Integration
+
+Updated `src/ui/app_controller.cpp` to:
+- Create `MonitorManagerWin` on initialization
+- Inject it into `OverlayManager` via `SetMonitorManager()`
+- Configure `show_on_all_monitors` from config
+- Update on settings save
+
+### Test Requirements
+
+#### Unit Tests
+
+- `tests/unit/test_monitor_manager.cpp`:
+  - MonitorInfo default construction (1 test)
+  - MonitorInfo field assignment (1 test)
+  - Negative coordinates (1 test)
+  - OrientationToString (1 test)
+  - MockMonitorManager single/dual/portrait (5 tests)
+  - Win32 live tests: CreateMonitorManager, monitors count, primary exists, dimensions, names, DPI, refresh, callbacks (9 tests)
+
+#### UI Tests
+
+- `tests/ui/test_settings_dialog.cpp`:
+  - OverlayAllMonitorsDefaultTrue (1 test)
+  - OverlayAllMonitorsRoundTrip (1 test)
+
+#### Verification Criteria
+
+- [x] All Stage 7 tests still pass
+- [x] All new monitor manager tests pass (18 tests)
+- [x] All UI tests pass (17 total including 2 new)
+- [x] Application compiles with multi-monitor support
+- [x] Application starts correctly
+
+Validation results:
+
+- `cmake --preset=debug`: configured successfully.
+- `cmake --build --preset=debug`: build succeeded.
+- Unit tests: 106 tests passed (18 new monitor tests).
+- UI tests: 17 tests passed (2 new settings dialog tests).
+- `blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0".
 
 ### Deliverables
 
-- [x] MonitorManager interface
-- [x] Windows implementation
-- [x] Multi-overlay support
-- [x] Configuration option for all/primary only
+- [x] MonitorManager interface with orientation and DPI support
+- [x] Windows implementation using native Win32 APIs
+- [x] Multi-overlay support (one Slint window per monitor)
+- [x] Configuration option for all/primary only in Settings UI
+- [x] Comprehensive unit tests (18 new tests)
+- [x] UI tests for settings dialog toggle (2 new tests)
+- [x] All tests pass (106 unit + 17 UI = 123 total)
+- [x] Code compiles without errors
 
 ---
 

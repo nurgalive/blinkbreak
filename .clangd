@@ -1,68 +1,66 @@
-# clangd project configuration for BlinkBreak with MSVC C++23
+# clangd configuration for BlinkBreak
+# compile_commands.json at the project root is built/ninja-debug/compile_commands.json
+# (Ninja build: complete flags, all Slint includes, -std:c++latest).
 
+---
+# ── Global settings applying to all files ─────────────────────────────────────
 CompileFlags:
-  # Compiler configuration for MSVC environment
-  Compiler: clang-cl
+  Remove:
+    # Strip cl.exe/clang-cl std flags — we re-add the correct one per file type below
+    - "-std=*"
+    - "/std:*"
+    - "-std:*"
+    # MSVC-specific flags not understood by clang-cl
+    - "/MD*"
+    - "-MDd"
+    - "-MD"
+    - "/Zi"
+    - "-Zi"
+    - "-Zd"
+    - "/wd*"
+    - "/Ob*"
+    - "/Od"
+    - "/RTC*"
+    - "/FS"
+    - "/Fd*"
+    - "/Fo*"
+    - "/nologo"
+    - "/TP"
+    - "/bigobj"
+    - "/GS"
+    - "/W4"
+    - "/WX"
+    - "/MP"
+    - "/EHsc"
+    - "-EHsc"
+    - "/J"
+    - "/showIncludes"
 
-  # Add essential C++23 and MSVC flags
   Add:
-    # C++23 standard
-    - "-std=c++23"
-    - "/std:c++latest"
-
-    # MSVC compatibility
-    - "--driver-mode=cl"
-    - "-fms-extensions"
-    - "-fms-compatibility"
-    - "-fdelayed-template-parsing"
-
-    # Windows macros
-    - "-DNOMINMAX"
-    - "-DWIN32_LEAN_AND_MEAN"
-    - "-D_CRT_SECURE_NO_WARNINGS"
-    - "-DUNICODE"
-    - "-D_UNICODE"
-
-    # Enable proper C++23 library features
-    - "-D_HAS_CXX23=1"
-    - "-D__cpp_lib_expected=202211L"
-
-    # Include paths (adjust MSVC version as needed)
-    - "-IC:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/include"
-    - "-IC:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Auxiliary/VS/include"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um"
-    - "-IC:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/winrt"
-
-    # Project include paths
+    # Supplemental Slint include paths for any file that might open without a
+    # matching compile_commands entry
+    - "-Ibuild/ninja-debug/_deps/slint-src/api/cpp/include"
+    - "-Ibuild/ninja-debug/_deps/slint-build/generated_include"
+    - "-Ibuild/ninja-debug/src"
+    - "-Ibuild/ninja-debug/tests/ui"
+    - "-Ibuild/debug/src"
+    - "-Ibuild/debug/tests/ui"
+    - "-Ibuild/debug/_deps/slint-src/api/cpp/include"
+    - "-Ibuild/debug/_deps/slint-build/generated_include"
+    # GoogleTest / GoogleMock for test files
+    - "-Ibuild/ninja-debug/_deps/googletest-src/googletest/include"
+    - "-Ibuild/ninja-debug/_deps/googletest-src/googlemock/include"
+    # project headers
     - "-Iinclude"
     - "-Isrc"
-    - "-Ibuild/debug/_deps/rapidjson-src/include"
-    - "-Ibuild/debug/_deps/spdlog-src/include"
-    - "-Ibuild/debug/_deps/googletest-src/googletest/include"
-    - "-Ibuild/debug/_deps/googletest-src/googlemock/include"
-
-    # Warnings
-    - "-Wall"
-    - "-Wextra"
-    - "-Wno-c++98-compat"
-    - "-Wno-c++98-compat-pedantic"
-    - "-Wno-missing-field-initializers"
-
-  # Remove flags that might conflict
-  Remove:
-    - "-march=*"
-    - "-mtune=*"
 
 Diagnostics:
-  # Suppress noisy warnings
   Suppress:
     - "missing-field-initializers"
     - "unused-parameter"
     - "unused-variable"
+    - "unknown-attributes"
 
-  # Tune clang-tidy checks
   ClangTidy:
     Add:
       - "modernize-*"
@@ -72,6 +70,7 @@ Diagnostics:
       - "modernize-use-trailing-return-type"
       - "readability-identifier-length"
       - "readability-magic-numbers"
+      - "readability-identifier-naming"
 
 Index:
   Background: Build
@@ -88,3 +87,28 @@ Hover:
 
 Completion:
   AllScopes: true
+
+---
+# ── C++ source files (.cpp / .cc) — take std from compile_commands + re-add ──
+If:
+  PathMatch: ".*\\.(cpp|cc|cxx)$"
+CompileFlags:
+  Add:
+    - "-std=c++23"
+    - "-fms-compatibility-version=19.44"
+
+---
+# ── Header files (.hpp / .h) — must force C++23 explicitly ───────────────────
+# Headers are NOT in compile_commands.json; clangd falls back to C++14 for them.
+# The PathMatch condition lets us apply std only to headers.
+If:
+  PathMatch: ".*\\.(hpp|h)$"
+CompileFlags:
+  Add:
+    - "-std=c++23"
+    - "-fms-compatibility-version=19.44"
+    - "-fms-extensions"
+    - "-fms-compatibility"
+    - "-D_WIN32"
+    - "-DWIN32"
+    - "-D_WINDOWS"

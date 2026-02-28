@@ -17,6 +17,27 @@
       }
     },
     {
+      "name": "ninja-debug",
+      "displayName": "Debug (Ninja - for clangd)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "BLINKBREAK_BUILD_TESTS": "ON",
+        "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
+        "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe",
+        "CMAKE_MT": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/mt.exe",
+        "CMAKE_RC_COMPILER": "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/rc.exe"
+      },
+      "environment": {
+        "INCLUDE": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/include;C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt;C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/shared;C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/um;C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/winrt",
+        "LIB": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/lib/x64;C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/ucrt/x64;C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0/um/x64",
+        "LIBPATH": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/lib/x64",
+        "Path": "C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64;C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64;$penv{Path}"
+      }
+    },
+    {
       "name": "debug",
       "displayName": "Debug",
       "inherits": "base",
@@ -46,6 +67,10 @@
       "name": "debug",
       "configurePreset": "debug",
       "configuration": "Debug"
+    },
+    {
+      "name": "ninja-debug",
+      "configurePreset": "ninja-debug"
     },
     {
       "name": "release",

@@ -15,7 +15,6 @@
     - [Running](#running)
   - [Project Structure](#project-structure)
   - [License](#license)
-  <!--toc:end-->
 
 A lightweight, cross-platform eye strain prevention application.
 
@@ -94,6 +93,18 @@ A lightweight, cross-platform eye strain prevention application.
 ### Build Commands
 
 Presets use the Visual Studio 17 2022 generator (multi-config).
+
+Run with ninja:
+
+```bash
+cmake --preset ninja-debug
+cmake --build --preset ninja-debug
+```
+
+Generate compile commands:
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\update_compile_commands.ps1
+```
 
 ```bash
 # Configure (Debug)

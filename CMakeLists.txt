@@ -48,6 +48,11 @@ endif()
 set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+
+# Silence RapidJSON warnings
+set(CMAKE_POLICY_DEFAULT_CMP0048 NEW)
+set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
+
 FetchContent_Declare(
     rapidjson
     GIT_REPOSITORY https://github.com/Tencent/rapidjson.git

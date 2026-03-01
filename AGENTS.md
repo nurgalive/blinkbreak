@@ -1101,39 +1101,90 @@ Implement OS-level idle detection to automatically pause timers when user is ina
 
 #### 9.1 Create Idle Detector Interface
 
-```cpp
-/// @brief Interface for idle detection.
-class IIdleDetector {
-public:
-    virtual ~IIdleDetector() = default;
-
-    /// @brief Starts monitoring for idle state.
-    virtual void Start() = 0;
-
-    /// @brief Stops monitoring.
-    virtual void Stop() = 0;
-
-    /// @brief Gets current idle time.
-    virtual Duration GetIdleTime() = 0;
-
-    /// @brief Sets threshold and callbacks.
-    virtual void SetIdleThreshold(Duration threshold) = 0;
-    virtual void SetOnIdle(std::function<void()> callback) = 0;
-    virtual void SetOnActive(std::function<void()> callback) = 0;
-};
-```
+Added `IIdleDetector` interface to `src/platform/platform_interface.hpp` with:
+- `Start()` / `Stop()` / `IsRunning()` for lifecycle management
+- `GetIdleTime()` to query current idle duration
+- `IsIdle()` to check if user is currently idle
+- `SetIdleThreshold()` / `GetIdleThreshold()` for threshold configuration
+- `SetOnIdle()` / `SetOnActive()` for callback registration
+- `CreateIdleDetector()` factory function
 
 #### 9.2 Windows Idle Detection
 
-Implement using `GetLastInputInfo` Win32 API.
+Implemented `IdleDetectorWin` in `src/platform/windows/idle_detector_win.hpp/cpp` using:
+- `GetLastInputInfo()` Win32 API to query last user input time
+- Background polling thread with 100ms intervals
+- Thread-safe callback invocation for idle/active state transitions
+- Proper cleanup on Stop() with thread joining
+
+#### 9.3 AppController Integration
+
+Updated `src/ui/app_controller.hpp/cpp` to:
+- Create and manage `IIdleDetector` instance
+- Start/stop detector with application lifecycle
+- Handle `OnUserIdle()` callback: pause scheduler if `pause_on_idle` is set, or reset if `reset_on_idle` is set
+- Handle `OnUserActive()` callback: auto-resume if paused due to idle
+- Track `is_paused_by_idle_` flag to distinguish idle-pause from manual pause
+
+#### 9.4 Settings UI Integration
+
+Updated `ui/components/settings_dialog.slint` with:
+- `idle-enabled` toggle button (Enabled/Disabled)
+- `idle-threshold-minutes` input field
+- `idle-pause-on-idle` toggle button (Yes/No)
+- `idle-reset-on-idle` toggle button (Yes/No)
+
+Updated `OnOpenSettings()` in `app_controller.cpp` to:
+- Bind idle settings from config when opening dialog
+- Parse and validate idle settings on save
+- Update idle detector settings dynamically (enable/disable, threshold changes)
+
+### Test Requirements
+
+#### Unit Tests
+
+- `tests/unit/test_idle_detector.cpp`:
+  - MockIdleDetector tests (8 tests): InitialState, StartAndStop, SetAndGetThreshold, SimulatedIdleTime, IdleCallbackTriggered, ActiveCallbackTriggered, CallbacksCanBeChanged, NullCallbacksAreHandled
+  - IdleDetectorWin tests (12 tests): CreateIdleDetector, InitialState, StartAndStop, StartTwiceIsNoOp, StopWhenNotRunningIsNoOp, SetAndGetThreshold, GetIdleTimeReturnsNonNegative, GetIdleTimeIncreases, IsIdleWithHighThreshold, CallbacksCanBeSet, MonitorThreadStopsCleanly, VeryShortThresholdTriggersIdle
+
+#### UI Tests
+
+- `tests/ui/test_settings_dialog.cpp`:
+  - IdleDetectionDefaults (1 test)
+  - IdleDetectionRoundTrip (1 test)
+
+#### Verification Criteria
+
+- [x] All Stage 8 tests still pass
+- [x] All new idle detector tests pass (20 tests)
+- [x] All UI tests pass (19 total including 2 new idle tests)
+- [x] Application compiles with idle detection
+- [x] Application starts correctly
+- [x] Settings dialog displays idle options
+- [x] Idle settings are persisted to config
+
+Validation results:
+
+- `cmake --preset=debug`: configured successfully.
+- `cmake --build --preset=debug`: build succeeded.
+- Unit tests: 126 tests passed (20 new idle detector tests).
+- UI tests: 19 tests passed (2 new idle settings tests).
+- `blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0".
 
 ### Deliverables
 
-- [x] IdleDetector interface
-- [x] Windows implementation
-- [x] Integration with state machine
-- [x] Auto-pause on idle
-- [x] Auto-resume on activity
+- [x] IdleDetector interface with full API
+- [x] Windows implementation using GetLastInputInfo
+- [x] Integration with state machine (UserIdleEvent/UserActiveEvent)
+- [x] Auto-pause on idle with `pause_on_idle` config
+- [x] Timer reset on idle with `reset_on_idle` config
+- [x] Auto-resume on activity (when paused due to idle)
+- [x] Settings UI for idle detection options
+- [x] Dynamic idle detector reconfiguration from settings
+- [x] Comprehensive unit tests (20 new tests)
+- [x] UI tests for idle settings (2 new tests)
+- [x] All tests pass (126 unit + 19 UI = 145 total)
+- [x] Code compiles without errors
 
 ---
 
@@ -1380,12 +1431,13 @@ This implementation plan provides a comprehensive 12-stage roadmap for building 
 | 4     | Message/Scheduler | 25          | 82          |
 | 5     | Basic UI          | -           | 82          |
 | 6     | System Tray       | -           | 82          |
-| 7     | Overlay           | -           | 82          |
-| 7B    | Stability/Assets  | -           | 82          |
-| 8     | Multi-Monitor     | -           | 82          |
-| 9     | Idle Detection    | 5           | 87          |
-| 10    | Notifications     | 3           | 90          |
-| 11    | DND Detection     | 2           | 92          |
-| 12    | Integration       | 10+         | 100+        |
+| 6B    | UI Tests          | 15          | 97          |
+| 7     | Overlay           | 2           | 99          |
+| 7B    | Stability/Assets  | -           | 99          |
+| 8     | Multi-Monitor     | 27          | 126 (unit)  |
+| 9     | Idle Detection    | 22          | 145 (126+19)|
+| 10    | Notifications     | 3           | -           |
+| 11    | DND Detection     | 2           | -           |
+| 12    | Integration       | 10+         | 160+        |
 
 Each stage builds upon the previous, maintaining a working prototype throughout development. Follow TDD principles strictly: write tests first, then implement the minimum code to pass.

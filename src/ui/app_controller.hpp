@@ -31,6 +31,11 @@ class SettingsDialog;
 
 namespace blinkbreak {
 
+namespace platform {
+class IMonitorManager;
+class IIdleDetector;
+}  // namespace platform
+
 /// @brief Main application controller.
 ///
 /// The AppController orchestrates the interaction between the UI,
@@ -130,6 +135,12 @@ private:
     /// @brief Updates UI bindings (called from timer thread).
     void UpdateUI();
 
+    /// @brief Handles user idle event from idle detector.
+    void OnUserIdle();
+
+    /// @brief Handles user active event from idle detector.
+    void OnUserActive();
+
     /// @brief Formats duration as MM:SS string.
     /// @param duration The duration to format.
     /// @return Formatted string.
@@ -141,6 +152,7 @@ private:
     std::unique_ptr<TrayManager> tray_manager_;
     std::unique_ptr<OverlayManager> overlay_manager_;
     std::shared_ptr<platform::IMonitorManager> monitor_manager_;
+    std::unique_ptr<platform::IIdleDetector> idle_detector_;
     AppConfig config_;
     std::filesystem::path config_path_;
 
@@ -168,6 +180,7 @@ private:
     bool skip_in_progress_;
     std::string status_text_;
     bool is_running_;
+    bool is_paused_by_idle_;
 };
 
 }  // namespace blinkbreak

@@ -4,6 +4,7 @@
 #ifndef BLINKBREAK_PLATFORM_INTERFACE_HPP
 #define BLINKBREAK_PLATFORM_INTERFACE_HPP
 
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <string>
@@ -126,6 +127,58 @@ public:
 /// @brief Creates platform-specific monitor manager implementation.
 /// @return Unique pointer to the monitor manager implementation.
 std::unique_ptr<IMonitorManager> CreateMonitorManager();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Idle Detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @brief Interface for idle detection.
+///
+/// Monitors user activity and provides callbacks when the user becomes idle
+/// or returns to active state. The idle threshold determines how long the user
+/// must be inactive before being considered idle.
+class IIdleDetector {
+public:
+    virtual ~IIdleDetector() = default;
+
+    /// @brief Starts monitoring for idle state.
+    virtual void Start() = 0;
+
+    /// @brief Stops monitoring.
+    virtual void Stop() = 0;
+
+    /// @brief Checks if the detector is currently monitoring.
+    /// @return True if monitoring is active.
+    [[nodiscard]] virtual bool IsRunning() const = 0;
+
+    /// @brief Gets current idle time in milliseconds.
+    /// @return The duration since last user input.
+    [[nodiscard]] virtual std::chrono::milliseconds GetIdleTime() const = 0;
+
+    /// @brief Checks if the user is currently considered idle.
+    /// @return True if idle time exceeds the configured threshold.
+    [[nodiscard]] virtual bool IsIdle() const = 0;
+
+    /// @brief Sets the idle threshold duration.
+    /// @param threshold Duration of inactivity before user is considered idle.
+    virtual void SetIdleThreshold(std::chrono::seconds threshold) = 0;
+
+    /// @brief Gets the current idle threshold.
+    /// @return The configured idle threshold.
+    [[nodiscard]] virtual std::chrono::seconds GetIdleThreshold() const = 0;
+
+    /// @brief Sets callback for when user becomes idle.
+    /// @param callback Function called when user transitions to idle state.
+    virtual void SetOnIdle(std::function<void()> callback) = 0;
+
+    /// @brief Sets callback for when user becomes active.
+    /// @param callback Function called when user transitions to active state.
+    virtual void SetOnActive(std::function<void()> callback) = 0;
+};
+
+/// @brief Creates platform-specific idle detector implementation.
+/// @return Unique pointer to the idle detector implementation.
+std::unique_ptr<IIdleDetector> CreateIdleDetector();
 
 }  // namespace platform
 }  // namespace blinkbreak

@@ -55,12 +55,19 @@ AppController::AppController()
       tracked_duration_(Duration::zero()),
       tracked_duration_ms_(DurationMs::zero()),
       skip_in_progress_(false),
-      is_running_(false) {
+      is_running_(false),
+      is_paused_by_idle_(false) {
     spdlog::debug("AppController created");
 }
 
 AppController::~AppController() {
     running_.store(false);
+
+    // Stop idle detector first
+    if (idle_detector_) {
+        idle_detector_->Stop();
+    }
+
     if (timer_thread_.joinable()) {
         timer_thread_.join();
     }
@@ -122,6 +129,21 @@ bool AppController::Initialize() {
     overlay_manager_->SetOnSkip([this] { OnSkip(); });
     overlay_manager_->SetOnSnooze([this] { OnSnooze(); });
     overlay_manager_->UpdateOpacity(config_.overlay.opacity);
+
+    // Create idle detector if enabled
+    if (config_.idle.enabled) {
+        idle_detector_ = platform::CreateIdleDetector();
+        if (idle_detector_) {
+            idle_detector_->SetIdleThreshold(
+                std::chrono::duration_cast<std::chrono::seconds>(config_.idle.threshold));
+            idle_detector_->SetOnIdle([this]() { OnUserIdle(); });
+            idle_detector_->SetOnActive([this]() { OnUserActive(); });
+            spdlog::info("Idle detection enabled with threshold={}s",
+                         config_.idle.threshold.count());
+        }
+    } else {
+        spdlog::info("Idle detection disabled");
+    }
 
     scheduler_->SetOnBreakStart([this](const BreakInfo& info) {
         spdlog::info("Break started: {}", BreakTypeToString(info.type));
@@ -285,6 +307,11 @@ int AppController::Run() {
     running_.store(true);
     timer_thread_ = std::thread(&AppController::TimerThreadFunc, this);
 
+    // Start idle detector if enabled
+    if (idle_detector_) {
+        idle_detector_->Start();
+    }
+
     // Auto-start if configured
     if (config_.auto_start) {
         OnStart();
@@ -301,6 +328,12 @@ int AppController::Run() {
     slint::run_event_loop(slint::EventLoopMode::RunUntilQuit);
 
     running_.store(false);
+
+    // Stop idle detector
+    if (idle_detector_) {
+        idle_detector_->Stop();
+    }
+
     if (timer_thread_.joinable()) {
         timer_thread_.join();
     }
@@ -439,15 +472,17 @@ void AppController::OnOpenSettings() {
             const auto long_interval_text = ToStdString(dialog->get_long_interval_minutes());
             const auto long_duration_text = ToStdString(dialog->get_long_duration_seconds());
             const auto snooze_duration_text = ToStdString(dialog->get_snooze_duration_minutes());
+            const auto idle_threshold_text = ToStdString(dialog->get_idle_threshold_minutes());
 
             const auto short_interval_minutes = ParsePositiveInt(short_interval_text);
             const auto short_duration_seconds = ParsePositiveInt(short_duration_text);
             const auto long_interval_minutes = ParsePositiveInt(long_interval_text);
             const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
             const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
+            const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
 
             if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
-                !long_duration_seconds || !snooze_duration_minutes) {
+                !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes) {
                 dialog->set_validation_error(
                     slint::SharedString("All fields must be positive integers."));
                 return;
@@ -464,6 +499,12 @@ void AppController::OnOpenSettings() {
             updated.long_break.duration = Duration(*long_duration_seconds);
             updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
             updated.overlay.show_on_all_monitors = dialog->get_overlay_all_monitors();
+
+            // Update idle config
+            updated.idle.enabled = dialog->get_idle_enabled();
+            updated.idle.threshold = Duration(*idle_threshold_minutes * 60);
+            updated.idle.pause_on_idle = dialog->get_idle_pause_on_idle();
+            updated.idle.reset_on_idle = dialog->get_idle_reset_on_idle();
 
             auto errors = config_manager_->Validate(updated);
             if (!errors.empty()) {
@@ -525,6 +566,34 @@ void AppController::OnOpenSettings() {
                 overlay_manager_->SetShowOnAllMonitors(updated.overlay.show_on_all_monitors);
             }
 
+            // Update idle detector settings
+            if (updated.idle.enabled) {
+                if (!idle_detector_) {
+                    // Create idle detector if it didn't exist
+                    idle_detector_ = platform::CreateIdleDetector();
+                    if (idle_detector_) {
+                        idle_detector_->SetOnIdle([this]() { OnUserIdle(); });
+                        idle_detector_->SetOnActive([this]() { OnUserActive(); });
+                    }
+                }
+                if (idle_detector_) {
+                    idle_detector_->SetIdleThreshold(
+                        std::chrono::duration_cast<std::chrono::seconds>(updated.idle.threshold));
+                    if (!idle_detector_->IsRunning()) {
+                        idle_detector_->Start();
+                    }
+                    spdlog::info("Idle detection updated: threshold={}s, pause={}, reset={}",
+                                 updated.idle.threshold.count(), updated.idle.pause_on_idle,
+                                 updated.idle.reset_on_idle);
+                }
+            } else {
+                // Disable idle detection
+                if (idle_detector_ && idle_detector_->IsRunning()) {
+                    idle_detector_->Stop();
+                    spdlog::info("Idle detection disabled");
+                }
+            }
+
             UpdateUI();
             dialog->hide();
         });
@@ -547,6 +616,14 @@ void AppController::OnOpenSettings() {
     dialog->set_snooze_duration_minutes(slint::SharedString(
         std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
     dialog->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
+
+    // Bind idle settings
+    dialog->set_idle_enabled(snapshot.idle.enabled);
+    dialog->set_idle_threshold_minutes(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.idle.threshold.count() / 60))));
+    dialog->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
+    dialog->set_idle_reset_on_idle(snapshot.idle.reset_on_idle);
+
     dialog->set_validation_error(slint::SharedString(""));
 
     dialog->show();
@@ -556,6 +633,11 @@ void AppController::OnQuit() {
     spdlog::info("Quit requested");
 
     running_.store(false);
+
+    // Stop idle detector
+    if (idle_detector_) {
+        idle_detector_->Stop();
+    }
 
     if (main_window_weak_) {
         auto ui_weak = *main_window_weak_;
@@ -785,6 +867,87 @@ std::string AppController::FormatDuration(Duration duration) {
     auto minutes = total_seconds / 60;
     auto seconds = total_seconds % 60;
     return std::format("{:02}:{:02}", minutes, seconds);
+}
+
+void AppController::OnUserIdle() {
+    spdlog::info("User became idle");
+
+    bool should_pause = false;
+    bool should_reset = false;
+    {
+        std::lock_guard lock(mutex_);
+        should_pause = config_.idle.pause_on_idle;
+        should_reset = config_.idle.reset_on_idle;
+    }
+
+    const auto current_state = state_machine_->GetCurrentState();
+
+    if (should_reset && current_state == State::kRunning) {
+        // Reset timers on idle if configured
+        spdlog::info("Resetting timers due to idle");
+        {
+            std::lock_guard scheduler_lock(scheduler_mutex_);
+            scheduler_->Reset();
+        }
+        state_machine_->ProcessEvent(UserIdleEvent{});
+        {
+            std::lock_guard lock(mutex_);
+            status_text_ = "Idle - Timers reset";
+            is_paused_by_idle_ = false;
+            short_progress_ = 0.0f;
+            long_progress_ = 0.0f;
+        }
+    } else if (should_pause && current_state == State::kRunning) {
+        // Pause on idle
+        spdlog::info("Pausing due to idle");
+        auto result = state_machine_->ProcessEvent(UserIdleEvent{});
+        if (result.success) {
+            {
+                std::lock_guard scheduler_lock(scheduler_mutex_);
+                scheduler_->Pause();
+            }
+            {
+                std::lock_guard lock(mutex_);
+                status_text_ = "Idle - Paused";
+                is_paused_by_idle_ = true;
+            }
+            if (tray_manager_) {
+                tray_manager_->UpdateMenu(false);
+            }
+        }
+    }
+}
+
+void AppController::OnUserActive() {
+    spdlog::info("User became active");
+
+    bool was_paused_by_idle = false;
+    {
+        std::lock_guard lock(mutex_);
+        was_paused_by_idle = is_paused_by_idle_;
+    }
+
+    const auto current_state = state_machine_->GetCurrentState();
+
+    // Only auto-resume if we paused due to idle
+    if (was_paused_by_idle && current_state == State::kPaused) {
+        spdlog::info("Resuming after idle");
+        auto result = state_machine_->ProcessEvent(UserActiveEvent{});
+        if (result.success) {
+            {
+                std::lock_guard scheduler_lock(scheduler_mutex_);
+                scheduler_->Resume();
+            }
+            {
+                std::lock_guard lock(mutex_);
+                status_text_ = "Running";
+                is_paused_by_idle_ = false;
+            }
+            if (tray_manager_) {
+                tray_manager_->UpdateMenu(true);
+            }
+        }
+    }
 }
 
 }  // namespace blinkbreak

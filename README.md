@@ -77,6 +77,14 @@ A lightweight, cross-platform eye strain prevention application.
   - Added `MonitorManagerWin` for precise per-monitor DPI and position logic
   - Added a configuration toggle to restrict the overlay to the primary monitor
   - **Note**: Currently, GPU acceleration is not working with portrait monitors
+- Stage 9 (Idle Detection): complete
+  - `IIdleDetector` interface with lifecycle management and callbacks
+  - `IdleDetectorWin` implementation using `GetLastInputInfo` Win32 API
+  - Auto-pause timers when user is idle (configurable via settings)
+  - Auto-reset timers on idle (optional, configurable)
+  - Auto-resume when user becomes active
+  - Settings UI for idle detection (enable/disable, threshold, pause/reset options)
+  - 126 unit tests + 19 UI tests = 145 tests total
 
 ## Building
 

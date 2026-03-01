@@ -44,7 +44,7 @@ component NumberFieldRow inherits Rectangle {
 export component SettingsDialog inherits Window {
     title: "Settings";
     min-width: 420px;
-    min-height: 320px;
+    min-height: 420px;
 
     callback save-clicked();
     callback cancel-clicked();
@@ -57,6 +57,12 @@ export component SettingsDialog inherits Window {
     in-out property <string> long-duration-seconds: "300";
     in-out property <string> snooze-duration-minutes: "5";
     in-out property <bool> overlay-all-monitors: true;
+
+    // Idle detection settings
+    in-out property <bool> idle-enabled: true;
+    in-out property <string> idle-threshold-minutes: "3";
+    in-out property <bool> idle-pause-on-idle: true;
+    in-out property <bool> idle-reset-on-idle: false;
 
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
@@ -141,6 +147,80 @@ export component SettingsDialog inherits Window {
                 text: root.overlay-all-monitors ? "All Monitors" : "Primary Only";
                 clicked => {
                     root.overlay-all-monitors = !root.overlay-all-monitors;
+                }
+            }
+        }
+
+        // Idle detection section
+        Text {
+            text: "Idle Detection";
+            font-size: 14px;
+            font-weight: 600;
+            color: #444444;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: start;
+
+            Text {
+                text: "Enable idle detection";
+                width: 160px;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: #333333;
+            }
+
+            Button {
+                text: root.idle-enabled ? "Enabled" : "Disabled";
+                clicked => {
+                    root.idle-enabled = !root.idle-enabled;
+                }
+            }
+        }
+
+        NumberFieldRow {
+            label: "Idle threshold";
+            unit: "minutes";
+            value <=> root.idle-threshold-minutes;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: start;
+
+            Text {
+                text: "Pause on idle";
+                width: 160px;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: #333333;
+            }
+
+            Button {
+                text: root.idle-pause-on-idle ? "Yes" : "No";
+                clicked => {
+                    root.idle-pause-on-idle = !root.idle-pause-on-idle;
+                }
+            }
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: start;
+
+            Text {
+                text: "Reset on idle";
+                width: 160px;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: #333333;
+            }
+
+            Button {
+                text: root.idle-reset-on-idle ? "Yes" : "No";
+                clicked => {
+                    root.idle-reset-on-idle = !root.idle-reset-on-idle;
                 }
             }
         }

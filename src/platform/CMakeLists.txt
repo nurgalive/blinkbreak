@@ -15,6 +15,8 @@ if(WIN32)
             windows/tray_icon_win.cpp
             windows/monitor_manager_win.hpp
             windows/monitor_manager_win.cpp
+            windows/idle_detector_win.hpp
+            windows/idle_detector_win.cpp
     )
 endif()
 

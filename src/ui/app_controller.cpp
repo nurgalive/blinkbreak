@@ -12,6 +12,10 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
+#ifdef _WIN32
+    #include <windows.h>
+#endif
+
 #include "main_window.h"
 #include "platform/platform_interface.hpp"
 #include "tray_manager.hpp"
@@ -35,12 +39,26 @@ std::optional<int> ParsePositiveInt(const std::string& text) {
     if (end == text.c_str() || *end != '\0') {
         return std::nullopt;
     }
-    if (value <= 0 || value > std::numeric_limits<int>::max()) {
+    if (value <= 0 || value > (std::numeric_limits<int>::max)()) {
         return std::nullopt;
     }
 
     return static_cast<int>(value);
 }
+
+#ifdef _WIN32
+/// @brief Finds the native HWND of a window by its title.
+/// FindWindowW does not search HWND_MESSAGE windows, so it won't return
+/// the tray icon's hidden message window even though it shares the same title.
+HWND FindWindowByTitle(const wchar_t* title) {
+    HWND hwnd = FindWindowW(nullptr, title);
+    if (!hwnd) {
+        spdlog::warn("FindWindowByTitle: could not find '{}'",
+                     std::string(title, title + wcslen(title)));
+    }
+    return hwnd;
+}
+#endif
 
 }  // namespace
 
@@ -56,7 +74,9 @@ AppController::AppController()
       tracked_duration_ms_(DurationMs::zero()),
       skip_in_progress_(false),
       is_running_(false),
-      is_paused_by_idle_(false) {
+      is_paused_by_idle_(false),
+      show_idle_timer_(false),
+      idle_time_("00:00") {
     spdlog::debug("AppController created");
 }
 
@@ -225,6 +245,8 @@ bool AppController::Initialize() {
     long_skipped_count_ = 0;
     skip_in_progress_ = false;
     is_running_ = false;
+    show_idle_timer_ = config_.idle.show_timer;
+    idle_time_ = "00:00";
 
     main_window_ = std::make_unique<slint::ComponentHandle<MainWindow>>(MainWindow::create());
     main_window_weak_ = std::make_unique<slint::ComponentWeakHandle<MainWindow>>(*main_window_);
@@ -234,12 +256,22 @@ bool AppController::Initialize() {
     ui->on_pause_clicked([this] { OnPause(); });
     ui->on_settings_clicked([this] { OnOpenSettings(); });
 
-    // Handle window close - hide to tray instead of minimizing/quitting
+    // Handle window close - hide to tray instead of minimizing/quitting.
+    // We use Win32 ShowWindow(SW_HIDE) instead of Slint hide() because the
+    // software renderer loses its rendering buffer across Slint hide/show
+    // cycles, causing a blank white window on restore.
     ui->window().on_close_requested([this]() {
         spdlog::debug("Window close requested - hiding to tray");
+#ifdef _WIN32
+        HWND hwnd = FindWindowByTitle(L"BlinkBreak");
+        if (hwnd) {
+            ShowWindow(hwnd, SW_HIDE);
+        }
+#else
         if (main_window_) {
             (*main_window_)->hide();
         }
+#endif
         return slint::CloseRequestResponse::KeepWindowShown;
     });
 
@@ -254,15 +286,43 @@ bool AppController::Initialize() {
     ui->set_short_skipped_count(short_skipped_count_);
     ui->set_long_skipped_count(long_skipped_count_);
     ui->set_is_running(is_running_);
+    ui->set_show_idle_timer(show_idle_timer_);
+    ui->set_idle_time(slint::SharedString(idle_time_));
 
     // Initialize tray manager
     TrayManager::Callbacks tray_callbacks{
         .on_show_window =
             [this]() {
                 spdlog::debug("Tray: Show window");
+#ifdef _WIN32
+                HWND hwnd = FindWindowByTitle(L"BlinkBreak");
+                if (hwnd) {
+                    ShowWindow(hwnd, SW_SHOW);
+                    SetForegroundWindow(hwnd);
+
+                    // Workaround for winit-software renderer bug:
+                    // Force a physical resize event so Slint recreates its pixel buffer.
+                    RECT rect;
+                    if (GetWindowRect(hwnd, &rect)) {
+                        int width = rect.right - rect.left;
+                        int height = rect.bottom - rect.top;
+                        SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height,
+                                     SWP_NOMOVE | SWP_NOZORDER);
+                        slint::Timer::single_shot(
+                            std::chrono::milliseconds(50), [hwnd, width, height]() {
+                                SetWindowPos(hwnd, nullptr, 0, 0, width, height,
+                                             SWP_NOMOVE | SWP_NOZORDER);
+                            });
+                    }
+                }
+#else
                 if (main_window_) {
                     (*main_window_)->show();
                     (*main_window_)->window().set_minimized(false);
+                }
+#endif
+                if (main_window_) {
+                    (*main_window_)->window().request_redraw();
                 }
             },
         .on_start_pause =
@@ -456,7 +516,25 @@ void AppController::OnOpenSettings() {
         dialog->on_cancel_clicked([this] {
             if (settings_dialog_) {
                 (*settings_dialog_)->hide();
+                slint::invoke_from_event_loop([this]() {
+                    if (settings_dialog_) {
+                        settings_dialog_.reset();
+                    }
+                });
             }
+        });
+
+        // Handle settings window close button (X)
+        dialog->window().on_close_requested([this]() {
+            spdlog::debug("Settings close requested - destroying");
+
+            slint::invoke_from_event_loop([this]() {
+                if (settings_dialog_) {
+                    settings_dialog_.reset();
+                }
+            });
+
+            return slint::CloseRequestResponse::HideWindow;
         });
 
         dialog->on_save_clicked([this] {
@@ -499,12 +577,14 @@ void AppController::OnOpenSettings() {
             updated.long_break.duration = Duration(*long_duration_seconds);
             updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
             updated.overlay.show_on_all_monitors = dialog->get_overlay_all_monitors();
+            updated.overlay.opacity = dialog->get_overlay_opaque() ? 1.0f : 0.7f;
 
             // Update idle config
             updated.idle.enabled = dialog->get_idle_enabled();
             updated.idle.threshold = Duration(*idle_threshold_minutes * 60);
             updated.idle.pause_on_idle = dialog->get_idle_pause_on_idle();
             updated.idle.reset_on_idle = dialog->get_idle_reset_on_idle();
+            updated.idle.show_timer = dialog->get_idle_show_timer();
 
             auto errors = config_manager_->Validate(updated);
             if (!errors.empty()) {
@@ -582,9 +662,10 @@ void AppController::OnOpenSettings() {
                     if (!idle_detector_->IsRunning()) {
                         idle_detector_->Start();
                     }
-                    spdlog::info("Idle detection updated: threshold={}s, pause={}, reset={}",
-                                 updated.idle.threshold.count(), updated.idle.pause_on_idle,
-                                 updated.idle.reset_on_idle);
+                    spdlog::info(
+                        "Idle detection updated: threshold={}s, pause={}, reset={}, show_timer={}",
+                        updated.idle.threshold.count(), updated.idle.pause_on_idle,
+                        updated.idle.reset_on_idle, updated.idle.show_timer);
                 }
             } else {
                 // Disable idle detection
@@ -595,7 +676,13 @@ void AppController::OnOpenSettings() {
             }
 
             UpdateUI();
-            dialog->hide();
+
+            (*settings_dialog_)->hide();
+            slint::invoke_from_event_loop([this]() {
+                if (settings_dialog_) {
+                    settings_dialog_.reset();
+                }
+            });
         });
     }
 
@@ -616,6 +703,7 @@ void AppController::OnOpenSettings() {
     dialog->set_snooze_duration_minutes(slint::SharedString(
         std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
     dialog->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
+    dialog->set_overlay_opaque(snapshot.overlay.opacity > 0.8f);
 
     // Bind idle settings
     dialog->set_idle_enabled(snapshot.idle.enabled);
@@ -623,6 +711,7 @@ void AppController::OnOpenSettings() {
         std::to_string(static_cast<int>(snapshot.idle.threshold.count() / 60))));
     dialog->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
     dialog->set_idle_reset_on_idle(snapshot.idle.reset_on_idle);
+    dialog->set_idle_show_timer(snapshot.idle.show_timer);
 
     dialog->set_validation_error(slint::SharedString(""));
 
@@ -758,6 +847,8 @@ void AppController::UpdateUI() {
     int short_skipped_count = 0;
     int long_skipped_count = 0;
     bool is_running = false;
+    bool show_idle_timer = false;
+    std::string idle_time = "00:00";
     bool overlay_active = false;
     bool overlay_can_skip = false;
     bool overlay_can_snooze = false;
@@ -820,6 +911,21 @@ void AppController::UpdateUI() {
         long_skipped_count = long_skipped_count_;
         is_running = is_running_;
 
+        if (config_.idle.show_timer) {
+            std::chrono::milliseconds curr_idle{0};
+            if (idle_detector_ && idle_detector_->IsRunning()) {
+                curr_idle = idle_detector_->GetIdleTime();
+            }
+            auto idle_sec = std::chrono::duration_cast<std::chrono::seconds>(curr_idle);
+            idle_time_ = FormatDuration(std::chrono::duration_cast<Duration>(idle_sec));
+            show_idle_timer_ = true;
+        } else {
+            show_idle_timer_ = false;
+        }
+
+        show_idle_timer = show_idle_timer_;
+        idle_time = idle_time_;
+
         // Update tray status
         if (tray_manager_ && time_until_next) {
             tray_manager_->UpdateStatus(is_running_, *time_until_next,
@@ -845,7 +951,7 @@ void AppController::UpdateUI() {
     slint::invoke_from_event_loop([ui_weak, time_until_short, time_until_long, tracked_time,
                                    status_text, short_progress, long_progress, short_break_count,
                                    long_break_count, short_skipped_count, long_skipped_count,
-                                   is_running]() mutable {
+                                   is_running, show_idle_timer, idle_time]() mutable {
         if (auto ui_handle = ui_weak.lock()) {
             (*ui_handle)->set_time_until_short(slint::SharedString(time_until_short));
             (*ui_handle)->set_time_until_long(slint::SharedString(time_until_long));
@@ -858,20 +964,29 @@ void AppController::UpdateUI() {
             (*ui_handle)->set_short_skipped_count(short_skipped_count);
             (*ui_handle)->set_long_skipped_count(long_skipped_count);
             (*ui_handle)->set_is_running(is_running);
+            (*ui_handle)->set_show_idle_timer(show_idle_timer);
+            (*ui_handle)->set_idle_time(slint::SharedString(idle_time));
         }
     });
 }
 
 std::string AppController::FormatDuration(Duration duration) {
     auto total_seconds = duration.count();
-    auto minutes = total_seconds / 60;
     auto seconds = total_seconds % 60;
-    return std::format("{:02}:{:02}", minutes, seconds);
+    auto minutes = (total_seconds % 3600) / 60;
+    auto hours = (total_seconds % 86400) / 3600;
+    auto days = total_seconds / 86400;
+
+    if (total_seconds < 3600) {
+        return std::format("{:02}:{:02}", minutes, seconds);
+    } else if (total_seconds < 86400) {
+        return std::format("{:02}:{:02}:{:02}", hours, minutes, seconds);
+    } else {
+        return std::format("{}:{:02}:{:02}:{:02}", days, hours, minutes, seconds);
+    }
 }
 
 void AppController::OnUserIdle() {
-    spdlog::info("User became idle");
-
     bool should_pause = false;
     bool should_reset = false;
     {
@@ -879,6 +994,9 @@ void AppController::OnUserIdle() {
         should_pause = config_.idle.pause_on_idle;
         should_reset = config_.idle.reset_on_idle;
     }
+
+    spdlog::info("AppController: User became idle (config: pause_on_idle={}, reset_on_idle={})",
+                 should_pause, should_reset);
 
     const auto current_state = state_machine_->GetCurrentState();
 
@@ -893,7 +1011,7 @@ void AppController::OnUserIdle() {
         {
             std::lock_guard lock(mutex_);
             status_text_ = "Idle - Timers reset";
-            is_paused_by_idle_ = false;
+            is_paused_by_idle_ = true;
             short_progress_ = 0.0f;
             long_progress_ = 0.0f;
         }
@@ -919,13 +1037,13 @@ void AppController::OnUserIdle() {
 }
 
 void AppController::OnUserActive() {
-    spdlog::info("User became active");
-
     bool was_paused_by_idle = false;
     {
         std::lock_guard lock(mutex_);
         was_paused_by_idle = is_paused_by_idle_;
     }
+
+    spdlog::info("AppController: User became active (was_paused_by_idle={})", was_paused_by_idle);
 
     const auto current_state = state_machine_->GetCurrentState();
 

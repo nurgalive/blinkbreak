@@ -181,6 +181,8 @@ private:
     std::string status_text_;
     bool is_running_;
     bool is_paused_by_idle_;
+    bool show_idle_timer_;
+    std::string idle_time_;
 };
 
 }  // namespace blinkbreak

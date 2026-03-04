@@ -80,11 +80,12 @@ target_compile_definitions(spdlog PRIVATE _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_
 
 # Fetch Slint
 set(SLINT_FEATURE_INTERPRETER OFF CACHE BOOL "" FORCE)
+set(SLINT_LIVE_PREVIEW ON CACHE BOOL "" FORCE)
 set(ENV{RUSTFLAGS} "$ENV{RUSTFLAGS} -Awarnings")
 FetchContent_Declare(
     slint
     GIT_REPOSITORY https://github.com/slint-ui/slint.git
-    GIT_TAG v1.15.0
+    GIT_TAG v1.15.1
     SOURCE_SUBDIR api/cpp
 )
 FetchContent_MakeAvailable(slint)

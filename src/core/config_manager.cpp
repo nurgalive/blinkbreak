@@ -87,6 +87,9 @@ IdleConfig ReadIdleConfig(const Value& obj) {
     if (IsBoolField(obj, "reset_on_idle")) {
         config.reset_on_idle = obj["reset_on_idle"].GetBool();
     }
+    if (IsBoolField(obj, "show_timer")) {
+        config.show_timer = obj["show_timer"].GetBool();
+    }
 
     return config;
 }
@@ -161,6 +164,7 @@ Value WriteIdleConfig(const IdleConfig& config, rapidjson::Document::AllocatorTy
     obj.AddMember("threshold_seconds", SecondsFromDuration(config.threshold), allocator);
     obj.AddMember("pause_on_idle", config.pause_on_idle, allocator);
     obj.AddMember("reset_on_idle", config.reset_on_idle, allocator);
+    obj.AddMember("show_timer", config.show_timer, allocator);
 
     return obj;
 }
@@ -320,6 +324,7 @@ AppConfig ConfigManager::GetDefault() {
     config.idle.threshold = Duration(180);
     config.idle.pause_on_idle = true;
     config.idle.reset_on_idle = false;
+    config.idle.show_timer = false;
 
     config.notification.enabled = true;
     config.notification.warning_time = Duration(30);

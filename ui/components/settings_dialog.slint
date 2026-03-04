@@ -6,29 +6,28 @@ import {
     HorizontalBox,
     Button,
     LineEdit,
+    Switch,
+    ScrollView,
 } from "std-widgets.slint";
 
 component NumberFieldRow inherits Rectangle {
     in property <string> label: "";
     in property <string> unit: "";
     in-out property <string> value: "";
-
     height: 32px;
-
     HorizontalBox {
         spacing: 8px;
         alignment: start;
-
         Text {
             text: root.label;
-            width: 160px;
+            width: 140px;
             vertical-alignment: center;
             font-size: 12px;
             color: #333333;
         }
 
         LineEdit {
-            width: 120px;
+            width: 80px;
             text <=> root.value;
         }
 
@@ -43,9 +42,11 @@ component NumberFieldRow inherits Rectangle {
 
 export component SettingsDialog inherits Window {
     title: "Settings";
-    min-width: 420px;
-    min-height: 420px;
-
+    min-width: 360px;
+    min-height: 380px;
+    preferred-width: 360px;
+    preferred-height: 380px;
+    background: #fafafa;
     callback save-clicked();
     callback cancel-clicked();
 
@@ -57,184 +58,204 @@ export component SettingsDialog inherits Window {
     in-out property <string> long-duration-seconds: "300";
     in-out property <string> snooze-duration-minutes: "5";
     in-out property <bool> overlay-all-monitors: true;
+    in-out property <bool> overlay-opaque: false;
 
     // Idle detection settings
     in-out property <bool> idle-enabled: true;
     in-out property <string> idle-threshold-minutes: "3";
     in-out property <bool> idle-pause-on-idle: true;
     in-out property <bool> idle-reset-on-idle: false;
-
+    in-out property <bool> idle-show-timer: false;
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
-
     VerticalBox {
-        spacing: 14px;
         padding: 16px;
-
+        spacing: 14px;
         Text {
             text: "Settings";
             font-size: 18px;
             font-weight: 600;
         }
 
+        ScrollView {
+            VerticalBox {
+                spacing: 14px;
+
         // Short break section
         Text {
-            text: "Short Break";
-            font-size: 14px;
-            font-weight: 600;
-            color: #444444;
-        }
+                    text: "Short Break";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #444444;
+                }
 
-        NumberFieldRow {
-            label: "Interval";
-            unit: "minutes";
-            value <=> root.short-interval-minutes;
-        }
+                NumberFieldRow {
+                    label: "Interval";
+                    unit: "minutes";
+                    value <=> root.short-interval-minutes;
+                }
 
-        NumberFieldRow {
-            label: "Duration";
-            unit: "seconds";
-            value <=> root.short-duration-seconds;
-        }
+                NumberFieldRow {
+                    label: "Duration";
+                    unit: "seconds";
+                    value <=> root.short-duration-seconds;
+                }
 
         // Long break section
         Text {
-            text: "Long Break";
-            font-size: 14px;
-            font-weight: 600;
-            color: #444444;
-        }
+                    text: "Long Break";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #444444;
+                }
 
-        NumberFieldRow {
-            label: "Interval";
-            unit: "minutes";
-            value <=> root.long-interval-minutes;
-        }
+                NumberFieldRow {
+                    label: "Interval";
+                    unit: "minutes";
+                    value <=> root.long-interval-minutes;
+                }
 
-        NumberFieldRow {
-            label: "Duration";
-            unit: "seconds";
-            value <=> root.long-duration-seconds;
-        }
+                NumberFieldRow {
+                    label: "Duration";
+                    unit: "seconds";
+                    value <=> root.long-duration-seconds;
+                }
 
         // Overlay section
         Text {
-            text: "Overlay";
-            font-size: 14px;
-            font-weight: 600;
-            color: #444444;
-        }
-
-        NumberFieldRow {
-            label: "Snooze";
-            unit: "minutes";
-            value <=> root.snooze-duration-minutes;
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            alignment: start;
-
-            Text {
-                text: "Display on";
-                width: 160px;
-                vertical-alignment: center;
-                font-size: 12px;
-                color: #333333;
-            }
-
-            Button {
-                text: root.overlay-all-monitors ? "All Monitors" : "Primary Only";
-                clicked => {
-                    root.overlay-all-monitors = !root.overlay-all-monitors;
+                    text: "Overlay";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #444444;
                 }
-            }
-        }
+
+                NumberFieldRow {
+                    label: "Snooze";
+                    unit: "minutes";
+                    value <=> root.snooze-duration-minutes;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Display on all monitors";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
+
+                    Switch {
+                        checked <=> root.overlay-all-monitors;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Opaque overlay";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
+
+                    Switch {
+                        checked <=> root.overlay-opaque;
+                    }
+                }
 
         // Idle detection section
         Text {
-            text: "Idle Detection";
-            font-size: 14px;
-            font-weight: 600;
-            color: #444444;
-        }
+                    text: "Idle Detection";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: #444444;
+                }
 
-        HorizontalBox {
-            spacing: 8px;
-            alignment: start;
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Enable idle detection";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
 
-            Text {
-                text: "Enable idle detection";
-                width: 160px;
-                vertical-alignment: center;
-                font-size: 12px;
-                color: #333333;
-            }
+                    Switch {
+                        checked <=> root.idle-enabled;
+                    }
+                }
 
-            Button {
-                text: root.idle-enabled ? "Enabled" : "Disabled";
-                clicked => {
-                    root.idle-enabled = !root.idle-enabled;
+                NumberFieldRow {
+                    label: "Idle threshold";
+                    unit: "minutes";
+                    value <=> root.idle-threshold-minutes;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Pause on idle";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
+
+                    Switch {
+                        checked <=> root.idle-pause-on-idle;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Reset on idle";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
+
+                    Switch {
+                        checked <=> root.idle-reset-on-idle;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Show idle timer";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: #333333;
+                    }
+
+                    Switch {
+                        checked <=> root.idle-show-timer;
+                    }
+                }
+
+                if root.validation-error != "": Text {
+                    text: root.validation-error;
+                    font-size: 12px;
+                    color: #d32f2f;
                 }
             }
-        }
-
-        NumberFieldRow {
-            label: "Idle threshold";
-            unit: "minutes";
-            value <=> root.idle-threshold-minutes;
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            alignment: start;
-
-            Text {
-                text: "Pause on idle";
-                width: 160px;
-                vertical-alignment: center;
-                font-size: 12px;
-                color: #333333;
-            }
-
-            Button {
-                text: root.idle-pause-on-idle ? "Yes" : "No";
-                clicked => {
-                    root.idle-pause-on-idle = !root.idle-pause-on-idle;
-                }
-            }
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            alignment: start;
-
-            Text {
-                text: "Reset on idle";
-                width: 160px;
-                vertical-alignment: center;
-                font-size: 12px;
-                color: #333333;
-            }
-
-            Button {
-                text: root.idle-reset-on-idle ? "Yes" : "No";
-                clicked => {
-                    root.idle-reset-on-idle = !root.idle-reset-on-idle;
-                }
-            }
-        }
-
-        if root.validation-error != "": Text {
-            text: root.validation-error;
-            font-size: 12px;
-            color: #d32f2f;
         }
 
         HorizontalBox {
             spacing: 8px;
             alignment: end;
-
             Button {
                 text: "Cancel";
                 clicked => {

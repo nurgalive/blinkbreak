@@ -25,6 +25,7 @@ struct IdleConfig {
     Duration threshold = Duration::zero();  ///< Time before considered idle.
     bool pause_on_idle = true;              ///< Pause timer when idle.
     bool reset_on_idle = false;             ///< Reset timer when idle.
+    bool show_timer = false;                ///< Show idle timer in UI.
 };
 
 /// @brief Configuration for notifications.
@@ -36,10 +37,10 @@ struct NotificationConfig {
 
 /// @brief Configuration for the break overlay.
 struct OverlayConfig {
-    float opacity = 0.7f;                         ///< Overlay opacity (0.0 - 1.0).
-    bool show_on_all_monitors = true;             ///< Show overlay on all monitors.
-    bool allow_skip = true;                       ///< Allow skipping breaks.
-    bool allow_snooze = true;                     ///< Allow snoozing breaks.
+    float opacity = 0.7f;                      ///< Overlay opacity (0.0 - 1.0).
+    bool show_on_all_monitors = true;          ///< Show overlay on all monitors.
+    bool allow_skip = true;                    ///< Allow skipping breaks.
+    bool allow_snooze = true;                  ///< Allow snoozing breaks.
     Duration snooze_duration = Duration(300);  ///< Default snooze duration.
 };
 

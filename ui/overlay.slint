@@ -23,8 +23,7 @@ export component BreakOverlay inherits Window {
 
     // Semi-transparent background
     Rectangle {
-        background: black.with-alpha(root.overlay-opacity);
-
+        background: #5A5A5A.with-alpha(root.overlay-opacity);
         VerticalBox {
             alignment: center;
 
@@ -68,14 +67,12 @@ export component BreakOverlay inherits Window {
             HorizontalBox {
                 alignment: center;
                 spacing: 20px;
-
                 if root.can-skip: Button {
                     text: "Skip";
                     clicked => {
                         root.skip-clicked();
                     }
                 }
-
                 if root.can-snooze: Button {
                     text: root.snooze-label;
                     clicked => {

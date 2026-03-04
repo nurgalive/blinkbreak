@@ -14,17 +14,23 @@ component TimerDisplay inherits Rectangle {
     in property <int> long_break_count: 0;
     in property <int> short_skipped_count: 0;
     in property <int> long_skipped_count: 0;
-
+    in property <string> tracked_time: "00:00";
     width: 160px;
     height: 160px;
     border-radius: self.width / 2;
     background: #ffffff;
     border-width: 2px;
     border-color: #e0e0e0;
-
     VerticalLayout {
         alignment: center;
         spacing: 2px;
+        Text {
+            text: root.tracked_time;
+            font-size: 20px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            color: #2196f3;
+        }
 
         Text {
             text: "Breaks";
@@ -37,7 +43,6 @@ component TimerDisplay inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             spacing: 12px;
-
             Text {
                 text: "Short: " + root.short_break_count;
                 font-size: 10px;
@@ -66,7 +71,6 @@ component TimerDisplay inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             spacing: 12px;
-
             Text {
                 text: "Short: " + root.short_skipped_count;
                 font-size: 10px;
@@ -91,8 +95,11 @@ export { SettingsDialog }
 export component MainWindow inherits Window {
     title: "BlinkBreak";
     icon: @image-url("../resources/bb_logo_blue.ico");
-    min-width: 300px;
-    min-height: 200px;
+    min-width: 320px;
+    min-height: 420px;
+    preferred-width: 340px;
+    preferred-height: 440px;
+    background: #fafafa;
 
     // Callbacks to C++
     callback start-clicked();
@@ -111,8 +118,9 @@ export component MainWindow inherits Window {
     in property <int> short-skipped-count: 0;
     in property <int> long-skipped-count: 0;
     in property <bool> is-running: false;
+    in property <bool> show-idle-timer: false;
+    in property <string> idle-time: "00:00";
     out property <string> start-button-label: root.is-running ? "Pause" : "Start";
-
     VerticalBox {
         alignment: center;
         padding: 20px;
@@ -128,8 +136,8 @@ export component MainWindow inherits Window {
         // Timer display (short break countdown)
         HorizontalBox {
             alignment: center;
-
             TimerDisplay {
+                tracked_time: root.tracked-time;
                 short_break_count: root.short-break-count;
                 long_break_count: root.long-break-count;
                 short_skipped_count: root.short-skipped-count;
@@ -141,7 +149,6 @@ export component MainWindow inherits Window {
         VerticalBox {
             width: 100%;
             spacing: 6px;
-
             Text {
                 text: "Short break in: " + root.time-until-short;
                 font-size: 10px;
@@ -168,8 +175,8 @@ export component MainWindow inherits Window {
                 progress: root.long-progress;
             }
 
-            Text {
-                text: "Tracked time: " + root.tracked-time;
+            if (root.show-idle-timer): Text {
+                text: "Idle time: " + root.idle-time;
                 font-size: 10px;
                 color: #666666;
                 horizontal-alignment: left;
@@ -180,7 +187,6 @@ export component MainWindow inherits Window {
         HorizontalBox {
             alignment: center;
             spacing: 10px;
-
             Button {
                 text: root.start-button-label;
                 clicked => {

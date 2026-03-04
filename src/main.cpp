@@ -21,6 +21,8 @@ int main(int argc, char* argv[]) {
     // pre-rotation matrix, causing stretched/misrotated framebuffers on portrait
     // displays. The software renderer bypasses GPU compositing entirely.
     // Only set if not already overridden by the user.
+
+    // For windows keep winit-software
 #ifdef _WIN32
     if (std::getenv("SLINT_BACKEND") == nullptr) {
         _putenv_s("SLINT_BACKEND", "winit-software");

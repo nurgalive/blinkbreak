@@ -80,6 +80,8 @@
     - [Prerequisites](#prerequisites-5)
     - [Implementation Steps](#implementation-steps-5)
       - [6.1 Create Platform Interface for System Tray](#61-create-platform-interface-for-system-tray)
+        - [6.1 Notes (Update)](#61-notes-update)
+        - [6.1 Unstaged Changes (Working Tree)](#61-unstaged-changes-working-tree)
       - [6.2 Create Windows Tray Icon Implementation](#62-create-windows-tray-icon-implementation)
       - [6.3 Create Windows Tray Icon Implementation](#63-create-windows-tray-icon-implementation)
       - [6.4 Create TrayManager Class](#64-create-traymanager-class)
@@ -93,6 +95,7 @@
     - [Implementation Steps (6B)](#implementation-steps-6b)
     - [Test Requirements (6B)](#test-requirements-6b)
       - [Verification Criteria (6B)](#verification-criteria-6b)
+      - [Validation Commands (6B)](#validation-commands-6b)
     - [Deliverables (6B)](#deliverables-6b)
   - [Stage 7: Break Overlay Window](#stage-7-break-overlay-window)
     - [Goal](#goal-6)
@@ -101,6 +104,8 @@
       - [7.1 Create Overlay Slint File](#71-create-overlay-slint-file)
       - [7.2 Create Overlay Manager](#72-create-overlay-manager)
     - [Test Requirements](#test-requirements-6)
+      - [Tests Added](#tests-added)
+      - [Validation Results](#validation-results)
     - [Deliverables](#deliverables-6)
   - [Stage 7B: Stability \& Asset Pipeline](#stage-7b-stability--asset-pipeline)
     - [Goal (7B)](#goal-7b)
@@ -112,6 +117,13 @@
     - [Implementation Steps](#implementation-steps-7)
       - [8.1 Create Monitor Manager Interface](#81-create-monitor-manager-interface)
       - [8.2 Windows Monitor Implementation](#82-windows-monitor-implementation)
+      - [8.3 Multi-Monitor Overlay Manager](#83-multi-monitor-overlay-manager)
+      - [8.4 Settings Dialog Toggle](#84-settings-dialog-toggle)
+      - [8.5 AppController Integration](#85-appcontroller-integration)
+    - [Test Requirements](#test-requirements-7)
+      - [Unit Tests](#unit-tests-5)
+      - [UI Tests](#ui-tests)
+      - [Verification Criteria](#verification-criteria-6)
     - [Deliverables](#deliverables-7)
   - [Stage 9: Idle Detection](#stage-9-idle-detection)
     - [Goal](#goal-8)
@@ -119,6 +131,13 @@
     - [Implementation Steps](#implementation-steps-8)
       - [9.1 Create Idle Detector Interface](#91-create-idle-detector-interface)
       - [9.2 Windows Idle Detection](#92-windows-idle-detection)
+      - [9.3 AppController Integration](#93-appcontroller-integration)
+      - [9.4 Settings UI Integration](#94-settings-ui-integration)
+      - [9.5 Selective Timer Reset](#95-selective-timer-reset)
+    - [Test Requirements](#test-requirements-8)
+      - [Unit Tests](#unit-tests-6)
+      - [UI Tests](#ui-tests-1)
+      - [Verification Criteria](#verification-criteria-7)
     - [Deliverables](#deliverables-8)
   - [Stage 10: Notifications](#stage-10-notifications)
     - [Goal](#goal-9)
@@ -142,9 +161,9 @@
       - [12.2 Integration Tests](#122-integration-tests)
       - [12.3 Performance Testing](#123-performance-testing)
       - [12.4 Final Polish](#124-final-polish)
-    - [Test Requirements](#test-requirements-7)
+    - [Test Requirements](#test-requirements-9)
       - [Integration Tests](#integration-tests)
-      - [Verification Criteria](#verification-criteria-6)
+      - [Verification Criteria](#verification-criteria-8)
     - [Deliverables](#deliverables-11)
   - [Appendix A: Testing Commands Reference](#appendix-a-testing-commands-reference)
   - [Appendix B: Code Quality Commands](#appendix-b-code-quality-commands)
@@ -1137,7 +1156,13 @@ Updated `ui/components/settings_dialog.slint` with:
 Updated `OnOpenSettings()` in `app_controller.cpp` to:
 - Bind idle settings from config when opening dialog
 - Parse and validate idle settings on save
-- Update idle detector settings dynamically (enable/disable, threshold changes)
+#### 9.5 Selective Timer Reset
+
+Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
+- Only recreate and reset timers when the break `interval` actually changes.
+- Preserve running timers when non-timer settings (overlay opacity, messages, idle config, snooze duration) are updated.
+- Recreate only the `snooze_timer_` if the snooze duration changes, without disturbing the main break timers.
+- Preserve the `is_running_` state (Paused/Started) after a configuration update that triggers a reset.
 
 ### Test Requirements
 
@@ -1146,6 +1171,9 @@ Updated `OnOpenSettings()` in `app_controller.cpp` to:
 - `tests/unit/test_idle_detector.cpp`:
   - MockIdleDetector tests (8 tests): InitialState, StartAndStop, SetAndGetThreshold, SimulatedIdleTime, IdleCallbackTriggered, ActiveCallbackTriggered, CallbacksCanBeChanged, NullCallbacksAreHandled
   - IdleDetectorWin tests (12 tests): CreateIdleDetector, InitialState, StartAndStop, StartTwiceIsNoOp, StopWhenNotRunningIsNoOp, SetAndGetThreshold, GetIdleTimeReturnsNonNegative, GetIdleTimeIncreases, IsIdleWithHighThreshold, CallbacksCanBeSet, MonitorThreadStopsCleanly, VeryShortThresholdTriggersIdle
+
+- `tests/unit/test_break_scheduler.cpp` (updated):
+  - Selective Timer Reset tests (8 tests): UpdateConfigPreservesTimersWhenOnlyMessagesChange, UpdateConfigPreservesTimersWhenOverlaySettingsChange, UpdateConfigPreservesTimersWhenSnoozeDurationChanges, UpdateConfigPreservesTimersWhenEnabledFlagChanges, UpdateConfigResetsTimersWhenShortIntervalChanges, UpdateConfigResetsTimersWhenLongIntervalChanges, UpdateConfigPreservesRunningStateWhenIntervalChanges, UpdateConfigAppliesNewBreakDurationWithoutResettingTimers
 
 #### UI Tests
 
@@ -1157,6 +1185,7 @@ Updated `OnOpenSettings()` in `app_controller.cpp` to:
 
 - [x] All Stage 8 tests still pass
 - [x] All new idle detector tests pass (20 tests)
+- [x] All new selective timer reset tests pass (8 tests)
 - [x] All UI tests pass (19 total including 2 new idle tests)
 - [x] Application compiles with idle detection
 - [x] Application starts correctly
@@ -1167,7 +1196,7 @@ Validation results:
 
 - `cmake --preset=debug`: configured successfully.
 - `cmake --build --preset=debug`: build succeeded.
-- Unit tests: 126 tests passed (20 new idle detector tests).
+- Unit tests: 134 tests passed (20 new idle detector tests + 8 new scheduler tests).
 - UI tests: 19 tests passed (2 new idle settings tests).
 - `blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0".
 
@@ -1181,9 +1210,10 @@ Validation results:
 - [x] Auto-resume on activity (when paused due to idle)
 - [x] Settings UI for idle detection options
 - [x] Dynamic idle detector reconfiguration from settings
-- [x] Comprehensive unit tests (20 new tests)
+- [x] Comprehensive unit tests for idle (20 new tests)
+- [x] Selective timer reset tests (8 new tests)
 - [x] UI tests for idle settings (2 new tests)
-- [x] All tests pass (126 unit + 19 UI = 145 total)
+- [x] All tests pass (134 unit + 19 UI = 153 total)
 - [x] Code compiles without errors
 
 ---
@@ -1423,21 +1453,21 @@ doxygen Doxyfile
 
 This implementation plan provides a comprehensive 12-stage roadmap for building BlinkBreak:
 
-| Stage | Focus             | Tests Added | Total Tests |
-| ----- | ----------------- | ----------- | ----------- |
-| 1     | Foundation        | 10          | 10          |
-| 2     | State Machine     | 24          | 34          |
-| 3     | Configuration     | 23          | 57          |
-| 4     | Message/Scheduler | 25          | 82          |
-| 5     | Basic UI          | -           | 82          |
-| 6     | System Tray       | -           | 82          |
-| 6B    | UI Tests          | 15          | 97          |
-| 7     | Overlay           | 2           | 99          |
-| 7B    | Stability/Assets  | -           | 99          |
-| 8     | Multi-Monitor     | 27          | 126 (unit)  |
-| 9     | Idle Detection    | 22          | 145 (126+19)|
-| 10    | Notifications     | 3           | -           |
-| 11    | DND Detection     | 2           | -           |
-| 12    | Integration       | 10+         | 160+        |
+| Stage | Focus             | Tests Added | Total Tests  |
+| ----- | ----------------- | ----------- | ------------ |
+| 1     | Foundation        | 10          | 10           |
+| 2     | State Machine     | 24          | 34           |
+| 3     | Configuration     | 23          | 57           |
+| 4     | Message/Scheduler | 25          | 82           |
+| 5     | Basic UI          | -           | 82           |
+| 6     | System Tray       | -           | 82           |
+| 6B    | UI Tests          | 15          | 97           |
+| 7     | Overlay           | 2           | 99           |
+| 7B    | Stability/Assets  | -           | 99           |
+| 8     | Multi-Monitor     | 27          | 126 (unit)   |
+| 9     | Idle Detection    | 22          | 145 (126+19) |
+| 10    | Notifications     | 3           | -            |
+| 11    | DND Detection     | 2           | -            |
+| 12    | Integration       | 10+         | 160+         |
 
 Each stage builds upon the previous, maintaining a working prototype throughout development. Follow TDD principles strictly: write tests first, then implement the minimum code to pass.

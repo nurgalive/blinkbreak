@@ -8,6 +8,7 @@ import {
     LineEdit,
     Switch,
     ScrollView,
+    Palette,
 } from "std-widgets.slint";
 
 component NumberFieldRow inherits Rectangle {
@@ -23,7 +24,7 @@ component NumberFieldRow inherits Rectangle {
             width: 140px;
             vertical-alignment: center;
             font-size: 12px;
-            color: #333333;
+            color: Palette.foreground;
         }
 
         LineEdit {
@@ -35,7 +36,7 @@ component NumberFieldRow inherits Rectangle {
             text: root.unit;
             vertical-alignment: center;
             font-size: 12px;
-            color: #666666;
+            color: Palette.foreground.with-alpha(0.6);
         }
     }
 }
@@ -46,7 +47,7 @@ export component SettingsDialog inherits Window {
     min-height: 380px;
     preferred-width: 360px;
     preferred-height: 380px;
-    background: #fafafa;
+    background: Palette.background;
     callback save-clicked();
     callback cancel-clicked();
 
@@ -68,6 +69,18 @@ export component SettingsDialog inherits Window {
     in-out property <bool> idle-show-timer: false;
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
+
+    // Appearance / theme settings
+    in-out property <bool> theme-auto: true;   // follow OS
+    in-out property <bool> theme-dark: false;  // forced dark (only used when theme-auto is false)
+
+    // Each top-level Slint component owns its own SharedGlobals/FluentPalette.
+    // C++ must set this on the dialog too to keep its palette in sync with MainWindow.
+    // 0 = auto (follow OS), 1 = light, 2 = dark.
+    in property <int> color-scheme-index: 0;
+    changed color-scheme-index => {
+        Palette.color-scheme = root.color-scheme-index == 1 ? ColorScheme.light : root.color-scheme-index == 2 ? ColorScheme.dark : ColorScheme.unknown;
+    }
     VerticalBox {
         padding: 16px;
         spacing: 14px;
@@ -81,12 +94,55 @@ export component SettingsDialog inherits Window {
             VerticalBox {
                 spacing: 14px;
 
+        // Appearance section (first, so users see it right away)
+        Text {
+                    text: "Appearance";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: Palette.foreground;
+                }
+
+                HorizontalBox {
+                    height: 32px;
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Follow system theme";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.theme-auto;
+                    }
+                }
+
+                HorizontalBox {
+                    height: 32px;
+                    spacing: 8px;
+                    alignment: start;
+                    Text {
+                        text: "Dark mode";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: root.theme-auto ? Palette.foreground.with-alpha(0.4) : Palette.foreground;
+                    }
+
+                    Switch {
+                        enabled: !root.theme-auto;
+                        checked <=> root.theme-dark;
+                    }
+                }
+
         // Short break section
         Text {
                     text: "Short Break";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -106,7 +162,7 @@ export component SettingsDialog inherits Window {
                     text: "Long Break";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -126,7 +182,7 @@ export component SettingsDialog inherits Window {
                     text: "Overlay";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -136,6 +192,7 @@ export component SettingsDialog inherits Window {
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -143,7 +200,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -152,6 +209,7 @@ export component SettingsDialog inherits Window {
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -159,7 +217,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -172,10 +230,11 @@ export component SettingsDialog inherits Window {
                     text: "Idle Detection";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -183,7 +242,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -198,6 +257,7 @@ export component SettingsDialog inherits Window {
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -205,7 +265,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -214,6 +274,7 @@ export component SettingsDialog inherits Window {
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -221,7 +282,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -230,6 +291,7 @@ export component SettingsDialog inherits Window {
                 }
 
                 HorizontalBox {
+                    height: 32px;
                     spacing: 8px;
                     alignment: start;
                     Text {
@@ -237,7 +299,7 @@ export component SettingsDialog inherits Window {
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {

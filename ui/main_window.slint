@@ -5,6 +5,7 @@ import {
     HorizontalBox,
     Button,
     ProgressIndicator,
+    Palette,
 } from "std-widgets.slint";
 
 import { SettingsDialog } from "components/settings_dialog.slint";
@@ -18,9 +19,9 @@ component TimerDisplay inherits Rectangle {
     width: 160px;
     height: 160px;
     border-radius: self.width / 2;
-    background: #ffffff;
+    background: Palette.background;
     border-width: 2px;
-    border-color: #e0e0e0;
+    border-color: Palette.border;
     VerticalLayout {
         alignment: center;
         spacing: 2px;
@@ -37,7 +38,7 @@ component TimerDisplay inherits Rectangle {
             font-size: 12px;
             font-weight: 600;
             horizontal-alignment: center;
-            color: #424242;
+            color: Palette.foreground;
         }
 
         HorizontalLayout {
@@ -48,7 +49,7 @@ component TimerDisplay inherits Rectangle {
                 font-size: 10px;
                 font-weight: 500;
                 horizontal-alignment: center;
-                color: #757575;
+                color: Palette.foreground.with-alpha(0.6);
             }
 
             Text {
@@ -56,7 +57,7 @@ component TimerDisplay inherits Rectangle {
                 font-size: 10px;
                 font-weight: 500;
                 horizontal-alignment: center;
-                color: #757575;
+                color: Palette.foreground.with-alpha(0.6);
             }
         }
 
@@ -65,7 +66,7 @@ component TimerDisplay inherits Rectangle {
             font-size: 11px;
             font-weight: 600;
             horizontal-alignment: center;
-            color: #424242;
+            color: Palette.foreground;
         }
 
         HorizontalLayout {
@@ -76,7 +77,7 @@ component TimerDisplay inherits Rectangle {
                 font-size: 10px;
                 font-weight: 500;
                 horizontal-alignment: center;
-                color: #757575;
+                color: Palette.foreground.with-alpha(0.6);
             }
 
             Text {
@@ -84,7 +85,7 @@ component TimerDisplay inherits Rectangle {
                 font-size: 10px;
                 font-weight: 500;
                 horizontal-alignment: center;
-                color: #757575;
+                color: Palette.foreground.with-alpha(0.6);
             }
         }
     }
@@ -99,7 +100,7 @@ export component MainWindow inherits Window {
     min-height: 420px;
     preferred-width: 340px;
     preferred-height: 440px;
-    background: #fafafa;
+    background: Palette.background;
 
     // Callbacks to C++
     callback start-clicked();
@@ -120,6 +121,12 @@ export component MainWindow inherits Window {
     in property <bool> is-running: false;
     in property <bool> show-idle-timer: false;
     in property <string> idle-time: "00:00";
+    // 0 = auto (follow OS), 1 = light, 2 = dark
+    in property <int> color-scheme-index: 0;
+    // React to theme changes set by C++ and push into Palette.
+    changed color-scheme-index => {
+        Palette.color-scheme = root.color-scheme-index == 1 ? ColorScheme.light : root.color-scheme-index == 2 ? ColorScheme.dark : ColorScheme.unknown;
+    }
     out property <string> start-button-label: root.is-running ? "Pause" : "Start";
     VerticalBox {
         alignment: center;
@@ -152,7 +159,7 @@ export component MainWindow inherits Window {
             Text {
                 text: "Short break in: " + root.time-until-short;
                 font-size: 10px;
-                color: #666666;
+                color: Palette.foreground.with-alpha(0.6);
                 horizontal-alignment: left;
             }
 
@@ -165,7 +172,7 @@ export component MainWindow inherits Window {
             Text {
                 text: "Long break in: " + root.time-until-long;
                 font-size: 10px;
-                color: #666666;
+                color: Palette.foreground.with-alpha(0.6);
                 horizontal-alignment: left;
             }
 
@@ -178,7 +185,7 @@ export component MainWindow inherits Window {
             if (root.show-idle-timer): Text {
                 text: "Idle time: " + root.idle-time;
                 font-size: 10px;
-                color: #666666;
+                color: Palette.foreground.with-alpha(0.6);
                 horizontal-alignment: left;
             }
         }

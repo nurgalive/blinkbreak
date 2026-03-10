@@ -74,6 +74,16 @@
             "problemMatcher": [],
             "group": "build",
             "detail": "Clean the build directory"
+        },
+        {
+            "label": "Ninja: Build & Update Compile Commands",
+            "type": "shell",
+            "command": "cmake --preset ninja-debug; if ($?) { cmake --build --preset ninja-debug }; if ($?) { powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\update_compile_commands.ps1 }",
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "build",
+            "detail": "Configure with Ninja, build, and then update compile commands for clangd"
         }
     ]
 }

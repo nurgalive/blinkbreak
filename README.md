@@ -83,8 +83,12 @@ A lightweight, cross-platform eye strain prevention application.
   - Auto-pause timers when user is idle (configurable via settings)
   - Auto-reset timers on idle (optional, configurable)
   - Auto-resume when user becomes active
-  - Settings UI for idle detection (enable/disable, threshold, pause/reset options)
+  - Settings UI for idle detection (enable/disable, threshold, pause_on_idle/reset_options)
   - 126 unit tests + 19 UI tests = 145 tests total
+- Stage 9A (UI Theme & Developer Experience): complete
+  - Implemented Light/Dark/Auto theme support using Slint Palette
+  - Added theme settings to UI with persistent configuration
+  - Unified build and compile-commands update task for Ninja in VS Code
 
 ## Building
 
@@ -110,7 +114,8 @@ cmake --build --preset ninja-debug
 ```
 
 Generate compile commands:
-```
+
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\update_compile_commands.ps1
 ```
 

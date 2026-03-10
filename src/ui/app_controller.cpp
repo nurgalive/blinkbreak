@@ -289,6 +289,9 @@ bool AppController::Initialize() {
     ui->set_show_idle_timer(show_idle_timer_);
     ui->set_idle_time(slint::SharedString(idle_time_));
 
+    // Apply the saved theme preference.
+    ApplyTheme(config_.theme_mode);
+
     // Initialize tray manager
     TrayManager::Callbacks tray_callbacks{
         .on_show_window =
@@ -586,6 +589,15 @@ void AppController::OnOpenSettings() {
             updated.idle.reset_on_idle = dialog->get_idle_reset_on_idle();
             updated.idle.show_timer = dialog->get_idle_show_timer();
 
+            // Update theme mode
+            if (dialog->get_theme_auto()) {
+                updated.theme_mode = ThemeMode::kAuto;
+            } else if (dialog->get_theme_dark()) {
+                updated.theme_mode = ThemeMode::kDark;
+            } else {
+                updated.theme_mode = ThemeMode::kLight;
+            }
+
             auto errors = config_manager_->Validate(updated);
             if (!errors.empty()) {
                 dialog->set_validation_error(slint::SharedString(errors[0].message));
@@ -676,6 +688,7 @@ void AppController::OnOpenSettings() {
             }
 
             UpdateUI();
+            ApplyTheme(config_.theme_mode);
 
             (*settings_dialog_)->hide();
             slint::invoke_from_event_loop([this]() {
@@ -712,6 +725,14 @@ void AppController::OnOpenSettings() {
     dialog->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
     dialog->set_idle_reset_on_idle(snapshot.idle.reset_on_idle);
     dialog->set_idle_show_timer(snapshot.idle.show_timer);
+
+    // Bind theme settings
+    dialog->set_theme_auto(snapshot.theme_mode == ThemeMode::kAuto);
+    dialog->set_theme_dark(snapshot.theme_mode == ThemeMode::kDark);
+    // Push the current effective colour-scheme into the dialog's own palette.
+    // Each top-level component has its own FluentPalette, so we must set it here
+    // rather than relying on ApplyTheme (which runs before the dialog exists).
+    dialog->set_color_scheme_index(static_cast<int>(snapshot.theme_mode));
 
     dialog->set_validation_error(slint::SharedString(""));
 
@@ -1065,6 +1086,23 @@ void AppController::OnUserActive() {
                 tray_manager_->UpdateMenu(true);
             }
         }
+    }
+}
+
+void AppController::ApplyTheme(ThemeMode mode) {
+    if (!main_window_) {
+        return;
+    }
+    // IMPORTANT: each top-level Slint component (MainWindow, SettingsDialog, Overlay)
+    // owns its own SharedGlobals and thus its own FluentPalette instance.
+    // We must set color-scheme-index on every open window individually;
+    // the `changed` handler in each .slint file will push the value into
+    // that window's Palette.color-scheme.
+    const int index = static_cast<int>(mode);
+    spdlog::debug("ApplyTheme: mode={}", index);
+    (*main_window_)->set_color_scheme_index(index);
+    if (settings_dialog_) {
+        (*settings_dialog_)->set_color_scheme_index(index);
     }
 }
 

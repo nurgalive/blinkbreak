@@ -10,6 +10,13 @@
 
 namespace blinkbreak {
 
+/// @brief UI colour-scheme preference.
+enum class ThemeMode : int {
+    kAuto = 0,   ///< Follow the OS setting.
+    kLight = 1,  ///< Always use the light palette.
+    kDark = 2,   ///< Always use the dark palette.
+};
+
 /// @brief Configuration for a break type (short or long).
 struct BreakConfig {
     bool enabled = true;                   ///< Whether this break type is enabled.
@@ -46,13 +53,14 @@ struct OverlayConfig {
 
 /// @brief Complete application configuration.
 struct AppConfig {
-    BreakConfig short_break;          ///< Short break configuration.
-    BreakConfig long_break;           ///< Long break configuration.
-    IdleConfig idle;                  ///< Idle detection configuration.
-    NotificationConfig notification;  ///< Notification configuration.
-    OverlayConfig overlay;            ///< Overlay configuration.
-    bool start_minimized = false;     ///< Start in system tray.
-    bool auto_start = false;          ///< Auto-start timer on launch.
+    BreakConfig short_break;                  ///< Short break configuration.
+    BreakConfig long_break;                   ///< Long break configuration.
+    IdleConfig idle;                          ///< Idle detection configuration.
+    NotificationConfig notification;          ///< Notification configuration.
+    OverlayConfig overlay;                    ///< Overlay configuration.
+    bool start_minimized = false;             ///< Start in system tray.
+    bool auto_start = false;                  ///< Auto-start timer on launch.
+    ThemeMode theme_mode = ThemeMode::kAuto;  ///< UI colour-scheme preference.
 };
 
 }  // namespace blinkbreak

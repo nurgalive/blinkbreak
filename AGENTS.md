@@ -139,6 +139,10 @@
       - [UI Tests](#ui-tests-1)
       - [Verification Criteria](#verification-criteria-7)
     - [Deliverables](#deliverables-8)
+  - [Stage 9A: UI Theme \& Developer Experience](#stage-9a-ui-theme--developer-experience)
+    - [Goal (9A)](#goal-9a)
+    - [Implementation Steps (9A)](#implementation-steps-9a)
+    - [Deliverables (9A)](#deliverables-9a)
   - [Stage 10: Notifications](#stage-10-notifications)
     - [Goal](#goal-9)
     - [Prerequisites](#prerequisites-9)
@@ -1215,6 +1219,33 @@ Validation results:
 - [x] UI tests for idle settings (2 new tests)
 - [x] All tests pass (134 unit + 19 UI = 153 total)
 - [x] Code compiles without errors
+
+---
+
+## Stage 9A: UI Theme & Developer Experience
+
+### Goal (9A)
+
+Implement theme support (Light/Dark/Auto) using Slint Palette and improve developer experience with a unified build task.
+
+### Implementation Steps (9A)
+
+- **Theme Mode Support**:
+  - Added `ThemeMode` enum (Auto, Light, Dark) to `src/core/config_types.hpp`.
+  - Updated `AppConfig` to include `theme_mode`.
+  - Updated `ConfigManager` to serialize/deserialize `theme_mode` in JSON.
+  - Implemented `ApplyTheme` in `AppController` to push theme changes to all top-level Slint components.
+  - Refactored `MainWindow.slint` and `SettingsDialog.slint` to use `Palette` instead of hardcoded hex values.
+  - Added theme selection switches and logic to `SettingsDialog.slint`.
+- **Developer Experience**:
+  - Added "Ninja: Build & Update Compile Commands" task to `.vscode/tasks.json` for a more efficient development workflow.
+
+### Deliverables (9A)
+
+- [x] Theme mode configuration (Light/Dark/Auto)
+- [x] Slint Palette integration for dynamic styling
+- [x] Theme settings in UI
+- [x] VS Code task for Ninja build and compile commands update
 
 ---
 

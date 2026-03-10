@@ -146,6 +146,10 @@ private:
     /// @return Formatted string.
     [[nodiscard]] static std::string FormatDuration(Duration duration);
 
+    /// @brief Applies a colour-scheme preference to all windows.
+    /// @param mode The theme mode to apply.
+    void ApplyTheme(ThemeMode mode);
+
     std::unique_ptr<ConfigManager> config_manager_;
     std::unique_ptr<StateMachine> state_machine_;
     std::unique_ptr<BreakScheduler> scheduler_;

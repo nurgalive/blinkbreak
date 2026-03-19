@@ -6,24 +6,28 @@ import {
     HorizontalBox,
     Button,
     LineEdit,
-    Switch,
+    Palette,
     ScrollView,
+    Switch,
 } from "std-widgets.slint";
 
 component NumberFieldRow inherits Rectangle {
     in property <string> label: "";
     in property <string> unit: "";
     in-out property <string> value: "";
+
     height: 32px;
+
     HorizontalBox {
         spacing: 8px;
         alignment: start;
+
         Text {
             text: root.label;
             width: 140px;
             vertical-alignment: center;
             font-size: 12px;
-            color: #333333;
+            color: Palette.foreground;
         }
 
         LineEdit {
@@ -35,7 +39,7 @@ component NumberFieldRow inherits Rectangle {
             text: root.unit;
             vertical-alignment: center;
             font-size: 12px;
-            color: #666666;
+            color: Palette.foreground;
         }
     }
 }
@@ -46,7 +50,8 @@ export component SettingsDialog inherits Window {
     min-height: 380px;
     preferred-width: 360px;
     preferred-height: 380px;
-    background: #fafafa;
+    background: Palette.background;
+
     callback save-clicked();
     callback cancel-clicked();
 
@@ -59,6 +64,8 @@ export component SettingsDialog inherits Window {
     in-out property <string> snooze-duration-minutes: "5";
     in-out property <bool> overlay-all-monitors: true;
     in-out property <bool> overlay-opaque: false;
+    in-out property <bool> theme-follow-system: true;
+    in-out property <bool> theme-dark-mode: false;
 
     // Idle detection settings
     in-out property <bool> idle-enabled: true;
@@ -68,25 +75,39 @@ export component SettingsDialog inherits Window {
     in-out property <bool> idle-show-timer: false;
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
+    out property <bool> dark-mode-enabled: !root.theme-follow-system;
+    private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (
+        root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light
+    );
+
+    in-out property <ColorScheme> palette-color-scheme <=> Palette.color-scheme;
+    init => {
+        root.palette-color-scheme = root.active-color-scheme;
+    }
+    changed active-color-scheme => {
+        root.palette-color-scheme = root.active-color-scheme;
+    }
+
     VerticalBox {
         padding: 16px;
         spacing: 14px;
+
         Text {
             text: "Settings";
             font-size: 18px;
             font-weight: 600;
+            color: Palette.foreground;
         }
 
         ScrollView {
             VerticalBox {
                 spacing: 14px;
 
-        // Short break section
-        Text {
+                Text {
                     text: "Short Break";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -101,12 +122,11 @@ export component SettingsDialog inherits Window {
                     value <=> root.short-duration-seconds;
                 }
 
-        // Long break section
-        Text {
+                Text {
                     text: "Long Break";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -121,12 +141,11 @@ export component SettingsDialog inherits Window {
                     value <=> root.long-duration-seconds;
                 }
 
-        // Overlay section
-        Text {
+                Text {
                     text: "Overlay";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 NumberFieldRow {
@@ -138,12 +157,13 @@ export component SettingsDialog inherits Window {
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
                     Text {
                         text: "Display on all monitors";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -154,12 +174,13 @@ export component SettingsDialog inherits Window {
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
                     Text {
                         text: "Opaque overlay";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -167,23 +188,65 @@ export component SettingsDialog inherits Window {
                     }
                 }
 
-        // Idle detection section
-        Text {
-                    text: "Idle Detection";
+                Text {
+                    text: "Theme";
                     font-size: 14px;
                     font-weight: 600;
-                    color: #444444;
+                    color: Palette.foreground;
                 }
 
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
+                    Text {
+                        text: "Follow system theme";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.theme-follow-system;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Dark theme";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.theme-dark-mode;
+                        enabled: !root.theme-follow-system;
+                    }
+                }
+
+                Text {
+                    text: "Idle Detection";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: Palette.foreground;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
                     Text {
                         text: "Enable idle detection";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -200,12 +263,13 @@ export component SettingsDialog inherits Window {
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
                     Text {
                         text: "Pause on idle";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -216,12 +280,13 @@ export component SettingsDialog inherits Window {
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
                     Text {
                         text: "Reset on idle";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -232,12 +297,13 @@ export component SettingsDialog inherits Window {
                 HorizontalBox {
                     spacing: 8px;
                     alignment: start;
+
                     Text {
                         text: "Show idle timer";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
-                        color: #333333;
+                        color: Palette.foreground;
                     }
 
                     Switch {
@@ -256,6 +322,7 @@ export component SettingsDialog inherits Window {
         HorizontalBox {
             spacing: 8px;
             alignment: end;
+
             Button {
                 text: "Cancel";
                 clicked => {

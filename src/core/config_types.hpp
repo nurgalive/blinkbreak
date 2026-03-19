@@ -44,6 +44,12 @@ struct OverlayConfig {
     Duration snooze_duration = Duration(300);  ///< Default snooze duration.
 };
 
+/// @brief Configuration for application theming.
+struct ThemeConfig {
+    bool follow_system = true;  ///< Follow the operating system theme.
+    bool dark_mode = false;     ///< Use dark mode when not following the system.
+};
+
 /// @brief Complete application configuration.
 struct AppConfig {
     BreakConfig short_break;          ///< Short break configuration.
@@ -51,6 +57,7 @@ struct AppConfig {
     IdleConfig idle;                  ///< Idle detection configuration.
     NotificationConfig notification;  ///< Notification configuration.
     OverlayConfig overlay;            ///< Overlay configuration.
+    ThemeConfig theme;                ///< Application theme configuration.
     bool start_minimized = false;     ///< Start in system tray.
     bool auto_start = false;          ///< Auto-start timer on launch.
 };

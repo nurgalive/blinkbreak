@@ -84,7 +84,10 @@ A lightweight, cross-platform eye strain prevention application.
   - Auto-reset timers on idle (optional, configurable)
   - Auto-resume when user becomes active
   - Settings UI for idle detection (enable/disable, threshold, pause/reset options)
-  - 126 unit tests + 19 UI tests = 145 tests total
+  - Theme support added for follow-system, light, and dark modes in the main window and settings dialog
+  - Bug fix #3: Replaced overlay std-widget buttons with custom action buttons to stop a `slint_cpp.dll` crash during fullscreen multi-monitor overlays
+  - Validated 3 consecutive 10-second short-break overlay cycles with the roaming config, including the portrait monitor, with no crash
+  - 135 unit tests + 23 UI tests = 158 tests total
 
 ## Building
 
@@ -205,6 +208,10 @@ Get-ChildItem -Recurse -Include *.cpp,*.hpp src,tests,include | ForEach-Object {
 ```
 
 ### Running
+
+Config location:
+On Windows: `%APPDATA%\BlinkBreak\config.json`  
+Example: `C:\Users\<your-username>\AppData\Roaming\BlinkBreak\config.json`
 
 ```bash
 # Debug build (Visual Studio generator)

@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <slint.h>
 #include <string>
 #include <thread>
 
@@ -140,6 +141,12 @@ private:
 
     /// @brief Handles user active event from idle detector.
     void OnUserActive();
+
+    /// @brief Applies the configured theme to the main window.
+    void ApplyThemeToMainWindow();
+
+    /// @brief Applies the configured theme to the settings dialog.
+    void ApplyThemeToSettingsDialog();
 
     /// @brief Formats duration as MM:SS string.
     /// @param duration The duration to format.

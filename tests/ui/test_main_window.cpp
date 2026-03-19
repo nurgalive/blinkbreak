@@ -14,7 +14,7 @@ namespace {
 /// "Pause" when `is-running` is toggled, without requiring the event loop.
 TEST(MainWindowUiTest, StartButtonLabelReflectsRunningState) {
     auto window = MainWindow::create();
-    
+
     window->set_is_running(false);
     EXPECT_EQ(ToStdString(window->get_start_button_label()), "Start");
 
@@ -27,7 +27,7 @@ TEST(MainWindowUiTest, StartButtonLabelReflectsRunningState) {
 /// increments the callback spy exactly once.
 TEST(MainWindowUiTest, StartClickedInvokesCallback) {
     auto window = MainWindow::create();
-    
+
     CallbackSpy start_spy;
     window->on_start_clicked([&start_spy]() { start_spy(); });
 
@@ -42,7 +42,7 @@ TEST(MainWindowUiTest, StartClickedInvokesCallback) {
 /// increments the callback spy exactly once.
 TEST(MainWindowUiTest, PauseClickedInvokesCallback) {
     auto window = MainWindow::create();
-    
+
     CallbackSpy pause_spy;
     window->on_pause_clicked([&pause_spy]() { pause_spy(); });
 
@@ -57,7 +57,7 @@ TEST(MainWindowUiTest, PauseClickedInvokesCallback) {
 /// a single invocation.
 TEST(MainWindowUiTest, SettingsCallbackInvokes) {
     auto window = MainWindow::create();
-    
+
     CallbackSpy settings_spy;
 
     window->on_settings_clicked([&settings_spy]() { settings_spy(); });
@@ -72,7 +72,7 @@ TEST(MainWindowUiTest, SettingsCallbackInvokes) {
 /// tracked time, and skipped counts) and verifies getters return identical values.
 TEST(MainWindowUiTest, PropertiesRoundTrip) {
     auto window = MainWindow::create();
-    
+
     window->set_time_until_short("05:00");
     window->set_time_until_long("25:00");
     window->set_tracked_time("00:45");
@@ -94,6 +94,25 @@ TEST(MainWindowUiTest, PropertiesRoundTrip) {
     EXPECT_EQ(window->get_long_break_count(), 1);
     EXPECT_EQ(window->get_short_skipped_count(), 1);
     EXPECT_EQ(window->get_long_skipped_count(), 3);
+}
+
+/// @test Verifies theme properties round-trip on the main window.
+TEST(MainWindowUiTest, ThemePropertiesRoundTrip) {
+    auto window = MainWindow::create();
+
+    EXPECT_TRUE(window->get_theme_follow_system());
+    EXPECT_FALSE(window->get_theme_dark_mode());
+    EXPECT_FALSE(window->get_dark_theme_enabled());
+
+    window->set_theme_follow_system(false);
+    window->set_theme_dark_mode(true);
+
+    EXPECT_FALSE(window->get_theme_follow_system());
+    EXPECT_TRUE(window->get_theme_dark_mode());
+    EXPECT_TRUE(window->get_dark_theme_enabled());
+
+    window->set_theme_follow_system(true);
+    EXPECT_FALSE(window->get_dark_theme_enabled());
 }
 
 }  // namespace

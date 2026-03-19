@@ -34,6 +34,10 @@
     "warning_seconds": 30,
     "respect_dnd": true
   },
+  "theme": {
+    "follow_system": true,
+    "dark_mode": false
+  },
   "overlay": {
     "opacity": 0.7,
     "show_on_all_monitors": true,

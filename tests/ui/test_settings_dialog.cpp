@@ -127,5 +127,29 @@ TEST(SettingsDialogUiTest, IdleDetectionRoundTrip) {
     EXPECT_FALSE(dialog->get_idle_reset_on_idle());
 }
 
+/// @test Verifies theme defaults and toggle availability.
+TEST(SettingsDialogUiTest, ThemeDefaultsAndEnablement) {
+    auto dialog = SettingsDialog::create();
+
+    EXPECT_TRUE(dialog->get_theme_follow_system());
+    EXPECT_FALSE(dialog->get_theme_dark_mode());
+    EXPECT_FALSE(dialog->get_dark_mode_enabled());
+}
+
+/// @test Verifies theme settings round-trip.
+TEST(SettingsDialogUiTest, ThemeSettingsRoundTrip) {
+    auto dialog = SettingsDialog::create();
+
+    dialog->set_theme_follow_system(false);
+    dialog->set_theme_dark_mode(true);
+
+    EXPECT_FALSE(dialog->get_theme_follow_system());
+    EXPECT_TRUE(dialog->get_theme_dark_mode());
+    EXPECT_TRUE(dialog->get_dark_mode_enabled());
+
+    dialog->set_theme_follow_system(true);
+    EXPECT_FALSE(dialog->get_dark_mode_enabled());
+}
+
 }  // namespace
 }  // namespace blinkbreak::ui_test

@@ -49,5 +49,16 @@ TEST(OverlayUiTest, SkipAndSnoozeCallbacksInvoke) {
     EXPECT_EQ(snooze_spy.count, 1);
 }
 
+/// @test Verifies overlay remains independent from app theme properties.
+TEST(OverlayUiTest, OverlayPropertiesRemainUnchangedByThemeWork) {
+    auto overlay = BreakOverlay::create();
+
+    EXPECT_EQ(ToStdString(overlay->get_message()), "Take a break!");
+    EXPECT_EQ(ToStdString(overlay->get_time_remaining()), "00:20");
+    EXPECT_EQ(ToStdString(overlay->get_break_type()), "Short");
+    EXPECT_TRUE(overlay->get_can_skip());
+    EXPECT_TRUE(overlay->get_can_snooze());
+}
+
 }  // namespace
 }  // namespace blinkbreak::ui_test

@@ -18,6 +18,11 @@ namespace {
 using rapidjson::Document;
 using rapidjson::Value;
 
+const AppConfig& DefaultConfig() {
+    static const AppConfig kDefaultConfig = ConfigManager::GetDefault();
+    return kDefaultConfig;
+}
+
 Duration DurationFromSeconds(std::int64_t seconds) {
     return Duration(seconds);
 }
@@ -43,9 +48,7 @@ bool IsNumberField(const Value& obj, const char* name) {
 }
 
 BreakConfig ReadBreakConfig(const Value& obj) {
-    // Start from the default configuration so that missing fields in the JSON
-    // preserve sensible defaults instead of being zero-initialized.
-    BreakConfig config = ConfigManager().GetDefault().short_break;
+    BreakConfig config = DefaultConfig().short_break;
 
     if (IsBoolField(obj, "enabled")) {
         config.enabled = obj["enabled"].GetBool();
@@ -73,7 +76,7 @@ BreakConfig ReadBreakConfig(const Value& obj) {
 }
 
 IdleConfig ReadIdleConfig(const Value& obj) {
-    IdleConfig config;
+    IdleConfig config = DefaultConfig().idle;
 
     if (IsBoolField(obj, "enabled")) {
         config.enabled = obj["enabled"].GetBool();
@@ -95,7 +98,7 @@ IdleConfig ReadIdleConfig(const Value& obj) {
 }
 
 NotificationConfig ReadNotificationConfig(const Value& obj) {
-    NotificationConfig config;
+    NotificationConfig config = DefaultConfig().notification;
 
     if (IsBoolField(obj, "enabled")) {
         config.enabled = obj["enabled"].GetBool();
@@ -110,8 +113,21 @@ NotificationConfig ReadNotificationConfig(const Value& obj) {
     return config;
 }
 
+ThemeConfig ReadThemeConfig(const Value& obj) {
+    ThemeConfig config = DefaultConfig().theme;
+
+    if (IsBoolField(obj, "follow_system")) {
+        config.follow_system = obj["follow_system"].GetBool();
+    }
+    if (IsBoolField(obj, "dark_mode")) {
+        config.dark_mode = obj["dark_mode"].GetBool();
+    }
+
+    return config;
+}
+
 OverlayConfig ReadOverlayConfig(const Value& obj) {
-    OverlayConfig config;
+    OverlayConfig config = DefaultConfig().overlay;
 
     if (IsNumberField(obj, "opacity")) {
         config.opacity = obj["opacity"].GetFloat();
@@ -141,8 +157,9 @@ void WriteMessagesArray(Value& array, rapidjson::Document::AllocatorType& alloca
     }
 }
 
-Value WriteBreakConfig(const BreakConfig& config, rapidjson::Document::AllocatorType& allocator) {
-    Value obj(rapidjson::kObjectType);
+void WriteBreakConfig(Value& obj, const BreakConfig& config,
+                      rapidjson::Document::AllocatorType& allocator) {
+    obj.SetObject();
 
     obj.AddMember("enabled", config.enabled, allocator);
     obj.AddMember("interval_seconds", SecondsFromDuration(config.interval), allocator);
@@ -153,36 +170,39 @@ Value WriteBreakConfig(const BreakConfig& config, rapidjson::Document::Allocator
     obj.AddMember("messages", messages, allocator);
 
     obj.AddMember("rotate_messages", config.rotate_messages, allocator);
-
-    return obj;
 }
 
-Value WriteIdleConfig(const IdleConfig& config, rapidjson::Document::AllocatorType& allocator) {
-    Value obj(rapidjson::kObjectType);
+void WriteIdleConfig(Value& obj, const IdleConfig& config,
+                     rapidjson::Document::AllocatorType& allocator) {
+    obj.SetObject();
 
     obj.AddMember("enabled", config.enabled, allocator);
     obj.AddMember("threshold_seconds", SecondsFromDuration(config.threshold), allocator);
     obj.AddMember("pause_on_idle", config.pause_on_idle, allocator);
     obj.AddMember("reset_on_idle", config.reset_on_idle, allocator);
     obj.AddMember("show_timer", config.show_timer, allocator);
-
-    return obj;
 }
 
-Value WriteNotificationConfig(const NotificationConfig& config,
-                              rapidjson::Document::AllocatorType& allocator) {
-    Value obj(rapidjson::kObjectType);
+void WriteNotificationConfig(Value& obj, const NotificationConfig& config,
+                             rapidjson::Document::AllocatorType& allocator) {
+    obj.SetObject();
 
     obj.AddMember("enabled", config.enabled, allocator);
     obj.AddMember("warning_seconds", SecondsFromDuration(config.warning_time), allocator);
     obj.AddMember("respect_dnd", config.respect_dnd, allocator);
-
-    return obj;
 }
 
-Value WriteOverlayConfig(const OverlayConfig& config,
-                         rapidjson::Document::AllocatorType& allocator) {
-    Value obj(rapidjson::kObjectType);
+void WriteThemeConfig(Value& obj, const ThemeConfig& config,
+                      rapidjson::Document::AllocatorType& allocator) {
+    obj.SetObject();
+
+    obj.AddMember("follow_system", config.follow_system, allocator);
+    obj.AddMember("dark_mode", config.dark_mode, allocator);
+}
+
+void WriteOverlayConfig(Value& obj, const OverlayConfig& config,
+                        rapidjson::Document::AllocatorType& allocator) {
+    obj.SetObject();
 
     obj.AddMember("opacity", config.opacity, allocator);
     obj.AddMember("show_on_all_monitors", config.show_on_all_monitors, allocator);
@@ -190,8 +210,6 @@ Value WriteOverlayConfig(const OverlayConfig& config,
     obj.AddMember("allow_snooze", config.allow_snooze, allocator);
     obj.AddMember("snooze_duration_seconds", SecondsFromDuration(config.snooze_duration),
                   allocator);
-
-    return obj;
 }
 
 }  // namespace
@@ -330,6 +348,9 @@ AppConfig ConfigManager::GetDefault() {
     config.notification.warning_time = Duration(30);
     config.notification.respect_dnd = true;
 
+    config.theme.follow_system = true;
+    config.theme.dark_mode = false;
+
     config.overlay.opacity = 0.7f;
     config.overlay.show_on_all_monitors = true;
     config.overlay.allow_skip = true;
@@ -380,6 +401,9 @@ ConfigResult<AppConfig> ConfigManager::ParseJson(const std::string& json_string)
     if (IsObjectField(doc, "notification")) {
         config.notification = ReadNotificationConfig(doc["notification"]);
     }
+    if (IsObjectField(doc, "theme")) {
+        config.theme = ReadThemeConfig(doc["theme"]);
+    }
     if (IsObjectField(doc, "overlay")) {
         config.overlay = ReadOverlayConfig(doc["overlay"]);
     }
@@ -407,12 +431,26 @@ std::string ConfigManager::ToJson(const AppConfig& config) const {
     doc.SetObject();
     auto& allocator = doc.GetAllocator();
 
-    doc.AddMember("short_break", WriteBreakConfig(config.short_break, allocator), allocator);
-    doc.AddMember("long_break", WriteBreakConfig(config.long_break, allocator), allocator);
-    doc.AddMember("idle", WriteIdleConfig(config.idle, allocator), allocator);
-    doc.AddMember("notification", WriteNotificationConfig(config.notification, allocator),
-                  allocator);
-    doc.AddMember("overlay", WriteOverlayConfig(config.overlay, allocator), allocator);
+    Value short_break(rapidjson::kObjectType);
+    Value long_break(rapidjson::kObjectType);
+    Value idle(rapidjson::kObjectType);
+    Value notification(rapidjson::kObjectType);
+    Value theme(rapidjson::kObjectType);
+    Value overlay(rapidjson::kObjectType);
+
+    WriteBreakConfig(short_break, config.short_break, allocator);
+    WriteBreakConfig(long_break, config.long_break, allocator);
+    WriteIdleConfig(idle, config.idle, allocator);
+    WriteNotificationConfig(notification, config.notification, allocator);
+    WriteThemeConfig(theme, config.theme, allocator);
+    WriteOverlayConfig(overlay, config.overlay, allocator);
+
+    doc.AddMember("short_break", short_break, allocator);
+    doc.AddMember("long_break", long_break, allocator);
+    doc.AddMember("idle", idle, allocator);
+    doc.AddMember("notification", notification, allocator);
+    doc.AddMember("theme", theme, allocator);
+    doc.AddMember("overlay", overlay, allocator);
     doc.AddMember("start_minimized", config.start_minimized, allocator);
     doc.AddMember("auto_start", config.auto_start, allocator);
 

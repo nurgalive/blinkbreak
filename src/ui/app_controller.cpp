@@ -46,6 +46,12 @@ std::optional<int> ParsePositiveInt(const std::string& text) {
     return static_cast<int>(value);
 }
 
+template <typename T>
+void ApplyThemeProperties(const slint::ComponentHandle<T>& component, const ThemeConfig& theme) {
+    component->set_theme_follow_system(theme.follow_system);
+    component->set_theme_dark_mode(theme.dark_mode);
+}
+
 #ifdef _WIN32
 /// @brief Finds the native HWND of a window by its title.
 /// FindWindowW does not search HWND_MESSAGE windows, so it won't return
@@ -288,6 +294,7 @@ bool AppController::Initialize() {
     ui->set_is_running(is_running_);
     ui->set_show_idle_timer(show_idle_timer_);
     ui->set_idle_time(slint::SharedString(idle_time_));
+    ApplyThemeProperties(*main_window_, config_.theme);
 
     // Initialize tray manager
     TrayManager::Callbacks tray_callbacks{
@@ -578,6 +585,8 @@ void AppController::OnOpenSettings() {
             updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
             updated.overlay.show_on_all_monitors = dialog->get_overlay_all_monitors();
             updated.overlay.opacity = dialog->get_overlay_opaque() ? 1.0f : 0.7f;
+            updated.theme.follow_system = dialog->get_theme_follow_system();
+            updated.theme.dark_mode = dialog->get_theme_dark_mode();
 
             // Update idle config
             updated.idle.enabled = dialog->get_idle_enabled();
@@ -646,6 +655,9 @@ void AppController::OnOpenSettings() {
                 overlay_manager_->SetShowOnAllMonitors(updated.overlay.show_on_all_monitors);
             }
 
+            ApplyThemeToMainWindow();
+            ApplyThemeToSettingsDialog();
+
             // Update idle detector settings
             if (updated.idle.enabled) {
                 if (!idle_detector_) {
@@ -704,6 +716,8 @@ void AppController::OnOpenSettings() {
         std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
     dialog->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
     dialog->set_overlay_opaque(snapshot.overlay.opacity > 0.8f);
+    dialog->set_theme_follow_system(snapshot.theme.follow_system);
+    dialog->set_theme_dark_mode(snapshot.theme.dark_mode);
 
     // Bind idle settings
     dialog->set_idle_enabled(snapshot.idle.enabled);
@@ -714,6 +728,7 @@ void AppController::OnOpenSettings() {
     dialog->set_idle_show_timer(snapshot.idle.show_timer);
 
     dialog->set_validation_error(slint::SharedString(""));
+    ApplyThemeToSettingsDialog();
 
     dialog->show();
 }
@@ -850,9 +865,6 @@ void AppController::UpdateUI() {
     bool show_idle_timer = false;
     std::string idle_time = "00:00";
     bool overlay_active = false;
-    bool overlay_can_skip = false;
-    bool overlay_can_snooze = false;
-    float overlay_opacity = 0.7f;
     std::string overlay_time_remaining;
 
     {
@@ -894,9 +906,6 @@ void AppController::UpdateUI() {
                 overlay_time_remaining = FormatDuration(*break_remaining);
                 overlay_active = true;
             }
-            overlay_can_skip = config_.overlay.allow_skip;
-            overlay_can_snooze = config_.overlay.allow_snooze;
-            overlay_opacity = config_.overlay.opacity;
         }
 
         time_until_short = time_until_short_;
@@ -936,8 +945,6 @@ void AppController::UpdateUI() {
     if (overlay_manager_) {
         if (overlay_active && !overlay_time_remaining.empty()) {
             overlay_manager_->UpdateTimeRemaining(overlay_time_remaining);
-            overlay_manager_->UpdateActions(overlay_can_skip, overlay_can_snooze);
-            overlay_manager_->UpdateOpacity(overlay_opacity);
         } else if (overlay_manager_->IsVisible()) {
             overlay_manager_->Hide();
         }
@@ -1066,6 +1073,34 @@ void AppController::OnUserActive() {
             }
         }
     }
+}
+
+void AppController::ApplyThemeToMainWindow() {
+    if (!main_window_) {
+        return;
+    }
+
+    ThemeConfig theme;
+    {
+        std::lock_guard lock(mutex_);
+        theme = config_.theme;
+    }
+
+    ApplyThemeProperties(*main_window_, theme);
+}
+
+void AppController::ApplyThemeToSettingsDialog() {
+    if (!settings_dialog_) {
+        return;
+    }
+
+    ThemeConfig theme;
+    {
+        std::lock_guard lock(mutex_);
+        theme = config_.theme;
+    }
+
+    ApplyThemeProperties(*settings_dialog_, theme);
 }
 
 }  // namespace blinkbreak

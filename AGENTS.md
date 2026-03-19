@@ -133,6 +133,7 @@
       - [9.2 Windows Idle Detection](#92-windows-idle-detection)
       - [9.3 AppController Integration](#93-appcontroller-integration)
       - [9.4 Settings UI Integration](#94-settings-ui-integration)
+      - [9A. Light and Dark Theme Support](#9a-light-and-dark-theme-support)
       - [9.5 Selective Timer Reset](#95-selective-timer-reset)
     - [Test Requirements](#test-requirements-8)
       - [Unit Tests](#unit-tests-6)
@@ -1156,6 +1157,50 @@ Updated `ui/components/settings_dialog.slint` with:
 Updated `OnOpenSettings()` in `app_controller.cpp` to:
 - Bind idle settings from config when opening dialog
 - Parse and validate idle settings on save
+
+#### 9A. Light and Dark Theme Support
+
+Added `ThemeConfig` to `src/core/config_types.hpp` and wired `theme.follow_system` / `theme.dark_mode` through `src/core/config_manager.cpp` plus `resources/config/default_config.json` so theme preferences persist with the rest of the app configuration.
+
+Updated `ui/main_window.slint` and `ui/components/settings_dialog.slint` to expose two theme controls:
+- `theme-follow-system`
+- `theme-dark-mode`
+
+Both windows now drive Slint's `Palette.color-scheme` through a local proxy property so the app can either follow the native OS theme (`ColorScheme.unknown`) or force light/dark mode. Existing overlay visuals in `ui/overlay.slint` were left unchanged to minimize risk.
+
+Updated `src/ui/app_controller.cpp` to:
+- Load persisted theme settings at startup
+- Apply theme properties to the main window during initialization
+- Bind theme fields into the settings dialog when opened
+- Save and re-apply theme changes immediately after settings are persisted
+
+Manual validation focused on overlay safety:
+- Ran `blinkbreak.exe` against a temporary config with `auto_start=true`, `short_break.interval=2s`, `short_break.duration=1s`, idle disabled, and dark mode forced.
+- Observed four consecutive short-break cycles in logs.
+- Verified each cycle still created overlays across all detected monitors, including the portrait display.
+- Verified break start/end transitions continued normally with no overlay crash or theme-related regression in the overlay path.
+
+#### 9B. Overlay Crash Fix for Multi-Break Runs
+
+Investigated a runtime crash that reproduced with the roaming config at `C:\Users\azn\AppData\Roaming\BlinkBreak\config.json` when the overlay first appeared during a short break (`interval=10s`, `duration=5s`, overlay opacity `1.0`, skip and snooze enabled).
+
+Crash triage results:
+- Reproduced the failure consistently during the first overlay show using the real roaming config.
+- Windows Application Error / WER entries reported `blinkbreak.exe` faulting in `slint_cpp.dll` with exception codes `0xc0000005` / `0xc000041d`.
+- Isolated the failure to the overlay action button path rather than theme persistence or idle detection.
+- Confirmed the crash still occurred with simplified configs while using std-widgets `Button` controls in `ui/overlay.slint`.
+
+Fix implemented:
+- Replaced overlay std-widgets `Button` usage in `ui/overlay.slint` with a lightweight custom `OverlayActionButton` built from `Rectangle` + `TouchArea`.
+- Stopped pushing redundant per-tick overlay action/opacity updates from `AppController::UpdateUI()` once the overlay is already active, leaving message/time updates intact.
+- Preserved skip/snooze callbacks and overlay styling while avoiding the crashing code path in Slint's standard button implementation for this fullscreen multi-monitor overlay scenario.
+
+Manual validation after the fix:
+- Rebuilt with `cmake --build --preset=debug` and re-ran the full suite with `ctest --preset=debug --output-on-failure`.
+- Re-ran `blinkbreak.exe` against the roaming config for multiple 10-second short-break cycles.
+- Observed three consecutive short breaks complete successfully with overlays shown on all monitors, including the portrait display.
+- Verified rotating short-break messages continued to advance and the process no longer crashed during overlay display.
+
 #### 9.5 Selective Timer Reset
 
 Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
@@ -1175,18 +1220,35 @@ Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
 - `tests/unit/test_break_scheduler.cpp` (updated):
   - Selective Timer Reset tests (8 tests): UpdateConfigPreservesTimersWhenOnlyMessagesChange, UpdateConfigPreservesTimersWhenOverlaySettingsChange, UpdateConfigPreservesTimersWhenSnoozeDurationChanges, UpdateConfigPreservesTimersWhenEnabledFlagChanges, UpdateConfigResetsTimersWhenShortIntervalChanges, UpdateConfigResetsTimersWhenLongIntervalChanges, UpdateConfigPreservesRunningStateWhenIntervalChanges, UpdateConfigAppliesNewBreakDurationWithoutResettingTimers
 
+- `tests/unit/test_config_manager.cpp` (updated):
+  - Theme default coverage (1 test extension)
+  - Theme parse coverage (1 new test)
+  - Theme JSON roundtrip coverage (1 test extension)
+
 #### UI Tests
 
 - `tests/ui/test_settings_dialog.cpp`:
   - IdleDetectionDefaults (1 test)
   - IdleDetectionRoundTrip (1 test)
+  - ThemeDefaultsAndEnablement (1 test)
+  - ThemeSettingsRoundTrip (1 test)
+
+- `tests/ui/test_main_window.cpp`:
+  - ThemePropertiesRoundTrip (1 test)
+
+- `tests/ui/test_overlay.cpp`:
+  - OverlayPropertiesRemainUnchangedByThemeWork (1 test)
 
 #### Verification Criteria
 
 - [x] All Stage 8 tests still pass
 - [x] All new idle detector tests pass (20 tests)
 - [x] All new selective timer reset tests pass (8 tests)
-- [x] All UI tests pass (19 total including 2 new idle tests)
+- [x] Theme settings persist through config load/save
+- [x] Main window and settings dialog support system/light/dark theme modes
+- [x] Overlay remains functional during repeated short breaks after theme changes
+- [x] Overlay no longer crashes with the roaming config during repeated 10-second short breaks
+- [x] All UI tests pass (23 total including 4 new theme/overlay tests)
 - [x] Application compiles with idle detection
 - [x] Application starts correctly
 - [x] Settings dialog displays idle options
@@ -1197,7 +1259,10 @@ Validation results:
 - `cmake --preset=debug`: configured successfully.
 - `cmake --build --preset=debug`: build succeeded.
 - Unit tests: 134 tests passed (20 new idle detector tests + 8 new scheduler tests).
-- UI tests: 19 tests passed (2 new idle settings tests).
+- `ctest --preset=debug --output-on-failure`: 158 tests passed.
+- UI tests: 23 tests passed (theme coverage added to main/settings plus overlay safety coverage).
+- Manual runtime validation: app ran with 2-second short breaks and 1-second overlays; 4 consecutive overlay cycles completed successfully on all monitors, including portrait.
+- Manual runtime validation (roaming config): app ran with `interval=10s` and `duration=5s`; 3 consecutive overlay cycles completed successfully on all monitors, including portrait, with no crash.
 - `blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0".
 
 ### Deliverables
@@ -1209,11 +1274,15 @@ Validation results:
 - [x] Timer reset on idle with `reset_on_idle` config
 - [x] Auto-resume on activity (when paused due to idle)
 - [x] Settings UI for idle detection options
+- [x] Settings UI for theme mode selection
+- [x] Persisted theme configuration with follow-system and dark-mode flags
+- [x] Main window theme application at startup and after settings save
+- [x] Overlay action buttons rewritten to avoid the Slint crash path in fullscreen multi-monitor overlays
 - [x] Dynamic idle detector reconfiguration from settings
 - [x] Comprehensive unit tests for idle (20 new tests)
 - [x] Selective timer reset tests (8 new tests)
-- [x] UI tests for idle settings (2 new tests)
-- [x] All tests pass (134 unit + 19 UI = 153 total)
+- [x] UI tests for idle settings and theme behavior (6 new tests total across main/settings/overlay)
+- [x] All tests pass (135 unit + 23 UI = 158 total)
 - [x] Code compiles without errors
 
 ---

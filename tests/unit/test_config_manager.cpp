@@ -62,6 +62,9 @@ TEST_F(ConfigManagerTest, GetDefaultReturnsValidConfig) {
     EXPECT_TRUE(config.notification.enabled);
     EXPECT_EQ(config.notification.warning_time, 30s);
 
+    EXPECT_TRUE(config.theme.follow_system);
+    EXPECT_FALSE(config.theme.dark_mode);
+
     EXPECT_FLOAT_EQ(config.overlay.opacity, 0.7f);
 }
 
@@ -136,6 +139,24 @@ TEST_F(ConfigManagerTest, ParseJsonMergesWithDefaults) {
 
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->short_break.messages.empty());
+    EXPECT_TRUE(result->theme.follow_system);
+    EXPECT_FALSE(result->theme.dark_mode);
+}
+
+/// @test ParseJson reads theme configuration.
+TEST_F(ConfigManagerTest, ParseJsonReadsThemeConfig) {
+    std::string json = R"({
+        "theme": {
+            "follow_system": false,
+            "dark_mode": true
+        }
+    })";
+
+    auto result = config_manager_->ParseJson(json);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->theme.follow_system);
+    EXPECT_TRUE(result->theme.dark_mode);
 }
 
 // ============================================================================
@@ -156,6 +177,8 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     auto original = ConfigManager::GetDefault();
     original.short_break.interval = 123s;
     original.overlay.opacity = 0.5f;
+    original.theme.follow_system = false;
+    original.theme.dark_mode = true;
 
     std::string json = config_manager_->ToJson(original);
     auto parsed = config_manager_->ParseJson(json);
@@ -163,6 +186,8 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     ASSERT_TRUE(parsed.has_value());
     EXPECT_EQ(parsed->short_break.interval, 123s);
     EXPECT_FLOAT_EQ(parsed->overlay.opacity, 0.5f);
+    EXPECT_FALSE(parsed->theme.follow_system);
+    EXPECT_TRUE(parsed->theme.dark_mode);
 }
 
 // ============================================================================

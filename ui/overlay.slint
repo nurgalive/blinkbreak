@@ -1,6 +1,33 @@
 // Break overlay window
 
-import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+component OverlayActionButton inherits Rectangle {
+    in property <string> label: "";
+    callback pressed();
+
+    min-width: 150px;
+    min-height: 48px;
+    border-radius: 24px;
+    border-width: 1px;
+    border-color: #FFFFFF66;
+    background: touch-area.has-hover ? #FFFFFF22 : #FFFFFF14;
+
+    Text {
+        text: root.label;
+        color: white;
+        font-size: 18px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch-area := TouchArea {
+        clicked => {
+            root.pressed();
+        }
+    }
+}
 
 export component BreakOverlay inherits Window {
     title: "Break";
@@ -67,15 +94,15 @@ export component BreakOverlay inherits Window {
             HorizontalBox {
                 alignment: center;
                 spacing: 20px;
-                if root.can-skip: Button {
-                    text: "Skip";
-                    clicked => {
+                if root.can-skip: OverlayActionButton {
+                    label: "Skip";
+                    pressed => {
                         root.skip-clicked();
                     }
                 }
-                if root.can-snooze: Button {
-                    text: root.snooze-label;
-                    clicked => {
+                if root.can-snooze: OverlayActionButton {
+                    label: root.snooze-label;
+                    pressed => {
                         root.snooze-clicked();
                     }
                 }

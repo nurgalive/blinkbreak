@@ -41,30 +41,17 @@ if(BLINKBREAK_BUILD_TESTS)
     include(GoogleTest)
 endif()
 
-# Fetch rapidjson
-if(EXISTS "${CMAKE_BINARY_DIR}/_deps/rapidjson-src/CMakeLists.txt")
-    set(FETCHCONTENT_SOURCE_DIR_RAPIDJSON "${CMAKE_BINARY_DIR}/_deps/rapidjson-src")
+# Fetch glaze
+if(EXISTS "${CMAKE_BINARY_DIR}/_deps/glaze-src/CMakeLists.txt")
+    set(FETCHCONTENT_SOURCE_DIR_GLAZE "${CMAKE_BINARY_DIR}/_deps/glaze-src")
 endif()
-set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "" FORCE)
-set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
-# Silence RapidJSON warnings
-set(CMAKE_POLICY_DEFAULT_CMP0048 NEW)
-set(CMAKE_POLICY_DEFAULT_CMP0175 OLD)
 
 FetchContent_Declare(
-    rapidjson
-    GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
-    GIT_TAG v1.1.0
+    glaze
+    GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+    GIT_TAG v7.2.1
 )
-FetchContent_MakeAvailable(rapidjson)
-if(NOT TARGET rapidjson::rapidjson)
-    add_library(rapidjson::rapidjson INTERFACE IMPORTED)
-    set_target_properties(rapidjson::rapidjson PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${rapidjson_SOURCE_DIR}/include"
-    )
-endif()
+FetchContent_MakeAvailable(glaze)
 
 # Fetch spdlog
 if(EXISTS "${CMAKE_BINARY_DIR}/_deps/spdlog-src/CMakeLists.txt")

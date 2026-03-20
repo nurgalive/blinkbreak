@@ -26,7 +26,7 @@ if(NOT TARGET blinkbreak_core)
     )
     target_link_libraries(blinkbreak_core
         PUBLIC
-            rapidjson::rapidjson
+            glaze::glaze
             spdlog::spdlog
     )
     target_compile_definitions(blinkbreak_core

@@ -100,6 +100,7 @@ A lightweight, cross-platform eye strain prevention application.
 - Clang-Format 15 or later (optional, for code formatting)
 - Gtest 1.17 or later (for unit testing)
 - Spdlog 1.17 or later (for logging)
+- Glaze 7.2.1 or later (for JSON parsing)
 
 ### Build Commands
 
@@ -113,7 +114,8 @@ cmake --build --preset ninja-debug
 ```
 
 Generate compile commands:
-```
+
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\update_compile_commands.ps1
 ```
 
@@ -146,7 +148,7 @@ ctest --preset=debug -R "^ui_"
 ctest --preset=debug -V > test_output.txt
 
 # Configure and build (Release)
-cmake --preset=release
+cmake --preset=release --fresh
 cmake --build --preset=release
 ```
 
@@ -210,7 +212,7 @@ Get-ChildItem -Recurse -Include *.cpp,*.hpp src,tests,include | ForEach-Object {
 ### Running
 
 Config location:
-On Windows: `%APPDATA%\BlinkBreak\config.json`  
+On Windows: `%APPDATA%\BlinkBreak\config.json`
 Example: `C:\Users\<your-username>\AppData\Roaming\BlinkBreak\config.json`
 
 ```bash

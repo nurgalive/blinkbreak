@@ -24,9 +24,6 @@ if(NOT TARGET blinkbreak_tests)
             ${PROJECT_SOURCE_DIR}/src
     )
 
-
-
-
     # Register tests with CTest
     gtest_discover_tests(blinkbreak_tests DISCOVERY_TIMEOUT 30 DISCOVERY_MODE PRE_TEST)
 endif()

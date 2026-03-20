@@ -134,12 +134,19 @@
       - [9.3 AppController Integration](#93-appcontroller-integration)
       - [9.4 Settings UI Integration](#94-settings-ui-integration)
       - [9A. Light and Dark Theme Support](#9a-light-and-dark-theme-support)
+      - [9B. Overlay Crash Fix for Multi-Break Runs](#9b-overlay-crash-fix-for-multi-break-runs)
       - [9.5 Selective Timer Reset](#95-selective-timer-reset)
     - [Test Requirements](#test-requirements-8)
       - [Unit Tests](#unit-tests-6)
       - [UI Tests](#ui-tests-1)
       - [Verification Criteria](#verification-criteria-7)
     - [Deliverables](#deliverables-8)
+      - [9C. Migration to Glaze JSON](#9c-migration-to-glaze-json)
+    - [Goal (9C)](#goal-9c)
+    - [Prerequisites (9C)](#prerequisites-9c)
+    - [Implementation Steps (9C)](#implementation-steps-9c)
+    - [Test Requirements (9C)](#test-requirements-9c)
+    - [Deliverables (9C)](#deliverables-9c)
   - [Stage 10: Notifications](#stage-10-notifications)
     - [Goal](#goal-9)
     - [Prerequisites](#prerequisites-9)
@@ -214,7 +221,7 @@ BlinkBreak is a Windows eye strain prevention application designed to help users
 | Build System  | CMake 3.25+ with Visual Studio 17 2022 |
 | GUI Framework | Slint 1.15+                            |
 | Testing       | Google Test / Google Mock              |
-| Configuration | JSON (rapidjson)                       |
+| Configuration | JSON (glaze)                           |
 | Logging       | spdlog                                 |
 | Code Style    | Google C++ Style Guide                 |
 
@@ -320,7 +327,7 @@ blinkbreak/
 | ----------- | ------- | ------------- | ------------ |
 | Slint       | 1.7+    | GUI Framework | FetchContent |
 | Google Test | 1.14+   | Unit Testing  | FetchContent |
-| RapidJSON   | 3.11+   | JSON Parsing  | FetchContent |
+| Glaze       | 7.2.1+  | JSON Parsing  | FetchContent |
 | spdlog      | 1.12+   | Logging       | FetchContent |
 
 ---
@@ -363,8 +370,8 @@ Created/updated files
 Notes
 
 - Presets use the Visual Studio 17 2022 generator (multi-config), so binaries land under `build/<preset>/Debug` or `build/<preset>/Release`.
-- Build system uses `rapidjson::rapidjson` and `spdlog::spdlog` in `src/CMakeLists.txt`.
-- RapidJSON docs/examples/tests are disabled to avoid duplicate `gtest` targets during configure.
+- Build system uses `glz::glaze` and `spdlog::spdlog` in `src/CMakeLists.txt`.
+- Glaze docs/examples/tests are managed via `FetchContent` as standard.
 - Stage 1 implementation matches the planned structure and minimal runnable prototype.
 
 ### Test Requirements
@@ -549,7 +556,7 @@ Source listing removed. See `src/main.cpp` for the demo wiring.
 
 Validation results:
 
-- cmake --preset=debug: configured; RapidJSON CMake policy warnings (dev).
+- cmake --preset=debug: configured; Glaze CMake policy warnings (dev).
 - cmake --build --preset=debug: build succeeded; MSVC STL4043 warnings from spdlog/fmt.
 - ctest --preset=debug: 55 tests passed.
 
@@ -661,7 +668,7 @@ Source listing removed. See `tests/CMakeLists.txt`.
 
 Validation results:
 
-- cmake --preset=debug: configured; RapidJSON CMake policy warnings (dev).
+- cmake --preset=debug: configured; Glaze CMake policy warnings (dev).
 - cmake --build --preset=debug: build succeeded; MSVC STL4043 warnings from spdlog/fmt.
 - ctest --preset=debug: 80 tests passed.
 
@@ -752,7 +759,7 @@ Source listing removed. See `src/CMakeLists.txt` for the build configuration.
 
 Validation results (latest):
 
-- `cmake --preset=debug`: configured successfully; RapidJSON dev warnings (non-critical).
+- `cmake --preset=debug`: configured successfully; Glaze dev warnings (non-critical).
 - `cmake --build --preset=debug`: build succeeded; Slint Rust warnings (non-fatal).
 - `blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0" correctly.
 - Application compiles with all UI components integrated.
@@ -962,7 +969,7 @@ Create `src/ui/overlay_manager.hpp` and `overlay_manager.cpp` for managing overl
 
 #### Validation Results
 
-- `cmake --preset=debug --fresh` (configured; RapidJSON dev warnings)
+- `cmake --preset=debug --fresh` (configured; Glaze dev warnings)
 - `cmake --build --preset=debug` (succeeded)
 - `ctest --preset=debug` (reported "No tests were found!!!")
 
@@ -1002,8 +1009,9 @@ Address threading panics in Slint UI updates across thread boundaries and improv
 ### Goal
 
 Extend the overlay system to support multiple monitors with configurable display options.
+
 - It should support portrait and horizontal orientation
-- It should support primary monitor only or all monitors via config paramter in settings UI.
+- It should support primary monitor only or all monitors via config parameter in settings UI.
 
 The correct approach uses one Slint window per monitor, positioned and sized via physical pixel coordinates using slint::Window::set_position() and set_size(), combined with Win32's EnumDisplayMonitors to enumerate displays and query their geometry (including orientation). Slint's set_fullscreen(true) alone is insufficient for multi-monitor scenarios — it only targets the primary display.
 The most important rule: never rely on set_fullscreen(true) alone for multi-monitor — it only targets the primary screen. Always manually set physical position and size from Win32 monitor data before calling set_fullscreen.
@@ -1029,6 +1037,7 @@ Source listing removed. See `src/platform/platform_interface.hpp`.
 #### 8.2 Windows Monitor Implementation
 
 Implemented `MonitorManagerWin` in `src/platform/windows/monitor_manager_win.hpp/cpp` using:
+
 - `EnumDisplayMonitors` + `GetMonitorInfoW` for geometry and position
 - `EnumDisplaySettingsW` with `DMDO_DEFAULT/90/180/270` for orientation
 - `GetDpiForMonitor` (Shcore) for per-monitor DPI
@@ -1040,6 +1049,7 @@ Source listing removed. See `src/platform/windows/monitor_manager_win.hpp/cpp`.
 #### 8.3 Multi-Monitor Overlay Manager
 
 Rewrote `src/ui/overlay_manager.hpp/cpp` to:
+
 - Manage a vector of `OverlayInstance` structs (one per target monitor)
 - Accept `IMonitorManager` via `SetMonitorManager()`
 - Support `SetShowOnAllMonitors(bool)` toggle
@@ -1055,6 +1065,7 @@ Wired `AppController` to read/write this toggle from `OverlayConfig.show_on_all_
 #### 8.5 AppController Integration
 
 Updated `src/ui/app_controller.cpp` to:
+
 - Create `MonitorManagerWin` on initialization
 - Inject it into `OverlayManager` via `SetMonitorManager()`
 - Configure `show_on_all_monitors` from config
@@ -1122,6 +1133,7 @@ Implement OS-level idle detection to automatically pause timers when user is ina
 #### 9.1 Create Idle Detector Interface
 
 Added `IIdleDetector` interface to `src/platform/platform_interface.hpp` with:
+
 - `Start()` / `Stop()` / `IsRunning()` for lifecycle management
 - `GetIdleTime()` to query current idle duration
 - `IsIdle()` to check if user is currently idle
@@ -1132,6 +1144,7 @@ Added `IIdleDetector` interface to `src/platform/platform_interface.hpp` with:
 #### 9.2 Windows Idle Detection
 
 Implemented `IdleDetectorWin` in `src/platform/windows/idle_detector_win.hpp/cpp` using:
+
 - `GetLastInputInfo()` Win32 API to query last user input time
 - Background polling thread with 100ms intervals
 - Thread-safe callback invocation for idle/active state transitions
@@ -1140,6 +1153,7 @@ Implemented `IdleDetectorWin` in `src/platform/windows/idle_detector_win.hpp/cpp
 #### 9.3 AppController Integration
 
 Updated `src/ui/app_controller.hpp/cpp` to:
+
 - Create and manage `IIdleDetector` instance
 - Start/stop detector with application lifecycle
 - Handle `OnUserIdle()` callback: pause scheduler if `pause_on_idle` is set, or reset if `reset_on_idle` is set
@@ -1149,12 +1163,14 @@ Updated `src/ui/app_controller.hpp/cpp` to:
 #### 9.4 Settings UI Integration
 
 Updated `ui/components/settings_dialog.slint` with:
+
 - `idle-enabled` toggle button (Enabled/Disabled)
 - `idle-threshold-minutes` input field
 - `idle-pause-on-idle` toggle button (Yes/No)
 - `idle-reset-on-idle` toggle button (Yes/No)
 
 Updated `OnOpenSettings()` in `app_controller.cpp` to:
+
 - Bind idle settings from config when opening dialog
 - Parse and validate idle settings on save
 
@@ -1163,18 +1179,21 @@ Updated `OnOpenSettings()` in `app_controller.cpp` to:
 Added `ThemeConfig` to `src/core/config_types.hpp` and wired `theme.follow_system` / `theme.dark_mode` through `src/core/config_manager.cpp` plus `resources/config/default_config.json` so theme preferences persist with the rest of the app configuration.
 
 Updated `ui/main_window.slint` and `ui/components/settings_dialog.slint` to expose two theme controls:
+
 - `theme-follow-system`
 - `theme-dark-mode`
 
 Both windows now drive Slint's `Palette.color-scheme` through a local proxy property so the app can either follow the native OS theme (`ColorScheme.unknown`) or force light/dark mode. Existing overlay visuals in `ui/overlay.slint` were left unchanged to minimize risk.
 
 Updated `src/ui/app_controller.cpp` to:
+
 - Load persisted theme settings at startup
 - Apply theme properties to the main window during initialization
 - Bind theme fields into the settings dialog when opened
 - Save and re-apply theme changes immediately after settings are persisted
 
 Manual validation focused on overlay safety:
+
 - Ran `blinkbreak.exe` against a temporary config with `auto_start=true`, `short_break.interval=2s`, `short_break.duration=1s`, idle disabled, and dark mode forced.
 - Observed four consecutive short-break cycles in logs.
 - Verified each cycle still created overlays across all detected monitors, including the portrait display.
@@ -1185,17 +1204,20 @@ Manual validation focused on overlay safety:
 Investigated a runtime crash that reproduced with the roaming config at `C:\Users\azn\AppData\Roaming\BlinkBreak\config.json` when the overlay first appeared during a short break (`interval=10s`, `duration=5s`, overlay opacity `1.0`, skip and snooze enabled).
 
 Crash triage results:
+
 - Reproduced the failure consistently during the first overlay show using the real roaming config.
 - Windows Application Error / WER entries reported `blinkbreak.exe` faulting in `slint_cpp.dll` with exception codes `0xc0000005` / `0xc000041d`.
 - Isolated the failure to the overlay action button path rather than theme persistence or idle detection.
 - Confirmed the crash still occurred with simplified configs while using std-widgets `Button` controls in `ui/overlay.slint`.
 
 Fix implemented:
+
 - Replaced overlay std-widgets `Button` usage in `ui/overlay.slint` with a lightweight custom `OverlayActionButton` built from `Rectangle` + `TouchArea`.
 - Stopped pushing redundant per-tick overlay action/opacity updates from `AppController::UpdateUI()` once the overlay is already active, leaving message/time updates intact.
 - Preserved skip/snooze callbacks and overlay styling while avoiding the crashing code path in Slint's standard button implementation for this fullscreen multi-monitor overlay scenario.
 
 Manual validation after the fix:
+
 - Rebuilt with `cmake --build --preset=debug` and re-ran the full suite with `ctest --preset=debug --output-on-failure`.
 - Re-ran `blinkbreak.exe` against the roaming config for multiple 10-second short-break cycles.
 - Observed three consecutive short breaks complete successfully with overlays shown on all monitors, including the portrait display.
@@ -1204,6 +1226,7 @@ Manual validation after the fix:
 #### 9.5 Selective Timer Reset
 
 Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
+
 - Only recreate and reset timers when the break `interval` actually changes.
 - Preserve running timers when non-timer settings (overlay opacity, messages, idle config, snooze duration) are updated.
 - Recreate only the `snooze_timer_` if the snooze duration changes, without disturbing the main break timers.
@@ -1284,6 +1307,39 @@ Validation results:
 - [x] UI tests for idle settings and theme behavior (6 new tests total across main/settings/overlay)
 - [x] All tests pass (135 unit + 23 UI = 158 total)
 - [x] Code compiles without errors
+
+---
+
+#### 9C. Migration to Glaze JSON
+
+### Goal (9C)
+
+Migrate the configuration system from RapidJSON to Glaze for improved performance, type safety, and a more modern C++ approach to JSON serialization.
+
+### Prerequisites (9C)
+
+- Stage 9 completed successfully.
+
+### Implementation Steps (9C)
+
+- **Library Integration:** Added Glaze as a dependency in the root `CMakeLists.txt` using `FetchContent`.
+- **Config Manager Update:** Rewrote `ConfigManager::ToJson` and `ConfigManager::ParseJson` to use `glz::write_json` and `glz::read_json<Config>`.
+- **Type Compatibility:** Added `glz::meta` to `Config` and nested structs in `config_types.hpp` to enable seamless serialization/deserialization.
+- **Error Handling:** Updated error reporting to use Glaze's `parse_error` structure, providing detailed byte-offset and error-type information.
+- **Cleanup:** Removed all RapidJSON includes, code paths, and CMake linkages.
+
+### Test Requirements (9C)
+
+- **Unit Tests:** Updated `test_config_manager.cpp` to verify Glaze-based serialization.
+- **Verification:** Ensured all 136 unit tests pass, including those previously failing due to missing DLLs (`spdlogd.dll`).
+
+### Deliverables (9C)
+
+- [x] Glaze integration in `CMakeLists.txt`
+- [x] Updated `config_types.hpp` with Glaze meta-tags
+- [x] Refactored `ConfigManager` using Glaze
+- [x] Removal of RapidJSON dependency
+- [x] 100% passing tests (136 total)
 
 ---
 

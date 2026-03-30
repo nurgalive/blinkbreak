@@ -65,6 +65,32 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(spdlog)
 target_compile_definitions(spdlog PRIVATE _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING)
 
+# Fetch WinToast
+if(EXISTS "${CMAKE_BINARY_DIR}/_deps/wintoast-src/CMakeLists.txt")
+    set(FETCHCONTENT_SOURCE_DIR_WINTOAST "${CMAKE_BINARY_DIR}/_deps/wintoast-src")
+endif()
+FetchContent_Declare(
+    wintoast
+    GIT_REPOSITORY https://github.com/mohabouje/WinToast.git
+    GIT_TAG v1.3.2
+)
+FetchContent_MakeAvailable(wintoast)
+
+if(NOT TARGET WinToast::WinToast)
+    if(TARGET WinToast)
+        add_library(WinToast::WinToast ALIAS WinToast)
+    else()
+        add_library(WinToast INTERFACE)
+        add_library(WinToast::WinToast ALIAS WinToast)
+        target_include_directories(WinToast INTERFACE
+            ${wintoast_SOURCE_DIR}/src
+        )
+        target_sources(WinToast INTERFACE
+            ${wintoast_SOURCE_DIR}/src/wintoastlib.cpp
+        )
+    endif()
+endif()
+
 # Fetch Slint
 set(SLINT_FEATURE_INTERPRETER OFF CACHE BOOL "" FORCE)
 set(SLINT_LIVE_PREVIEW ON CACHE BOOL "" FORCE)

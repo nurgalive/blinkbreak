@@ -312,6 +312,16 @@ BreakType BreakScheduler::GetNextBreakType() const {
                                                                       : BreakType::kLong;
 }
 
+std::string BreakScheduler::GetUpcomingMessage(BreakType type) const {
+    const MessageProvider* provider =
+        type == BreakType::kShort ? short_messages_.get() : long_messages_.get();
+    if (!provider) {
+        return "Take a break";
+    }
+
+    return std::string(provider->GetCurrent());
+}
+
 bool BreakScheduler::IsBreakActive() const {
     return break_active_;
 }
@@ -340,6 +350,8 @@ void BreakScheduler::UpdateConfig(const BreakConfig& short_break, const BreakCon
     const bool long_interval_changed = (long_break.interval != long_config_.interval);
     const bool snooze_duration_changed =
         (overlay.snooze_duration != overlay_config_.snooze_duration);
+    const bool short_enabled_changed = (short_break.enabled != short_config_.enabled);
+    const bool long_enabled_changed = (long_break.enabled != long_config_.enabled);
     const bool timers_need_reset = short_interval_changed || long_interval_changed;
 
     // Always update all config fields and messages.
@@ -405,6 +417,34 @@ void BreakScheduler::UpdateConfig(const BreakConfig& short_break, const BreakCon
         snooze_timer_->SetOnExpired([this]() { TriggerBreak(active_break_type_); });
 
         spdlog::debug("Snooze timer updated to {}s", overlay.snooze_duration.count());
+    }
+
+    if (!timers_need_reset && (short_enabled_changed || long_enabled_changed)) {
+        const bool can_start_timers = is_running_ && !break_active_ && !snooze_timer_->IsRunning();
+
+        if (short_enabled_changed) {
+            if (short_config_.enabled) {
+                short_timer_->Reset();
+                short_interval_total_ = short_config_.interval;
+                if (can_start_timers) {
+                    short_timer_->Start();
+                }
+            } else {
+                short_timer_->Pause();
+            }
+        }
+
+        if (long_enabled_changed) {
+            if (long_config_.enabled) {
+                long_timer_->Reset();
+                long_interval_total_ = long_config_.interval;
+                if (can_start_timers) {
+                    long_timer_->Start();
+                }
+            } else {
+                long_timer_->Pause();
+            }
+        }
     }
 
     spdlog::info(

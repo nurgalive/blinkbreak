@@ -68,6 +68,15 @@ TEST_F(ConfigManagerTest, GetDefaultReturnsValidConfig) {
     EXPECT_FLOAT_EQ(config.overlay.opacity, 0.7f);
 }
 
+/// @test Notification defaults are correct.
+TEST_F(ConfigManagerTest, NotificationConfigDefaults) {
+    auto config = ConfigManager::GetDefault();
+
+    EXPECT_TRUE(config.notification.enabled);
+    EXPECT_EQ(config.notification.warning_time, 30s);
+    EXPECT_TRUE(config.notification.respect_dnd);
+}
+
 /// @test GetDefault configuration passes validation.
 TEST_F(ConfigManagerTest, DefaultConfigPassesValidation) {
     auto config = ConfigManager::GetDefault();
@@ -157,6 +166,24 @@ TEST_F(ConfigManagerTest, ParseJsonReadsThemeConfig) {
     ASSERT_TRUE(result.has_value());
     EXPECT_FALSE(result->theme.follow_system);
     EXPECT_TRUE(result->theme.dark_mode);
+}
+
+/// @test ParseJson reads notification configuration.
+TEST_F(ConfigManagerTest, ParseJsonReadsNotificationConfig) {
+    std::string json = R"({
+        "notification": {
+            "enabled": false,
+            "warning_seconds": 45,
+            "respect_dnd": false
+        }
+    })";
+
+    auto result = config_manager_->ParseJson(json);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_FALSE(result->notification.enabled);
+    EXPECT_EQ(result->notification.warning_time, 45s);
+    EXPECT_FALSE(result->notification.respect_dnd);
 }
 
 // ============================================================================

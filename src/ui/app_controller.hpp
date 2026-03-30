@@ -5,9 +5,11 @@
 #define BLINKBREAK_UI_APP_CONTROLLER_HPP
 
 #include <atomic>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <slint.h>
 #include <string>
 #include <thread>
@@ -35,6 +37,8 @@ namespace blinkbreak {
 namespace platform {
 class IMonitorManager;
 class IIdleDetector;
+class INotificationManager;
+enum class NotificationAction;
 }  // namespace platform
 
 /// @brief Main application controller.
@@ -130,6 +134,10 @@ public:
     [[nodiscard]] std::string GetStatusText() const;
 
 private:
+    /// @brief Gets the current state snapshot.
+    /// @return Current state.
+    [[nodiscard]] State GetCurrentStateSnapshot() const;
+
     /// @brief Timer thread function.
     void TimerThreadFunc();
 
@@ -141,6 +149,12 @@ private:
 
     /// @brief Handles user active event from idle detector.
     void OnUserActive();
+
+    /// @brief Handles user actions from notifications.
+    void OnNotificationAction(platform::NotificationAction action);
+
+    /// @brief Shows a pre-break toast notification.
+    void ShowPreBreakNotification(BreakType type, Duration time_until);
 
     /// @brief Applies the configured theme to the main window.
     void ApplyThemeToMainWindow();
@@ -160,6 +174,7 @@ private:
     std::unique_ptr<OverlayManager> overlay_manager_;
     std::shared_ptr<platform::IMonitorManager> monitor_manager_;
     std::unique_ptr<platform::IIdleDetector> idle_detector_;
+    std::unique_ptr<platform::INotificationManager> notification_manager_;
     AppConfig config_;
     std::filesystem::path config_path_;
 
@@ -185,7 +200,11 @@ private:
     int short_skipped_count_;
     int long_skipped_count_;
     bool skip_in_progress_;
+    std::optional<BreakType> pending_notification_break_;
+    std::optional<platform::NotificationAction> pending_notification_action_;
+    int64_t active_toast_id_;
     std::string status_text_;
+    State current_state_;
     bool is_running_;
     bool is_paused_by_idle_;
     bool show_idle_timer_;

@@ -31,9 +31,9 @@ struct IdleConfig {
 
 /// @brief Configuration for notifications.
 struct NotificationConfig {
-    bool enabled = true;                       ///< Whether notifications are enabled.
-    Duration warning_time = Duration::zero();  ///< Time before break to show warning.
-    bool respect_dnd = true;                   ///< Respect Do Not Disturb mode.
+    bool enabled = true;                     ///< Whether notifications are enabled.
+    Duration warning_time = Duration(30);    ///< Time before break to show warning.
+    bool respect_dnd = true;                 ///< Respect Do Not Disturb mode.
 };
 
 /// @brief Configuration for the break overlay.

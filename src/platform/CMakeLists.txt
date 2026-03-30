@@ -17,6 +17,8 @@ if(WIN32)
             windows/monitor_manager_win.cpp
             windows/idle_detector_win.hpp
             windows/idle_detector_win.cpp
+            windows/notification_win.hpp
+            windows/notification_win.cpp
     )
 endif()
 
@@ -38,6 +40,8 @@ if(WIN32)
         PRIVATE
             shell32
             Shcore
+            WinToast::WinToast
+            runtimeobject
     )
 endif()
 

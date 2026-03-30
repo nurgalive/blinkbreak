@@ -133,9 +133,9 @@
       - [9.2 Windows Idle Detection](#92-windows-idle-detection)
       - [9.3 AppController Integration](#93-appcontroller-integration)
       - [9.4 Settings UI Integration](#94-settings-ui-integration)
+      - [9.5 Selective Timer Reset](#95-selective-timer-reset)
       - [9A. Light and Dark Theme Support](#9a-light-and-dark-theme-support)
       - [9B. Overlay Crash Fix for Multi-Break Runs](#9b-overlay-crash-fix-for-multi-break-runs)
-      - [9.5 Selective Timer Reset](#95-selective-timer-reset)
     - [Test Requirements](#test-requirements-8)
       - [Unit Tests](#unit-tests-6)
       - [UI Tests](#ui-tests-1)
@@ -151,8 +151,21 @@
     - [Goal](#goal-9)
     - [Prerequisites](#prerequisites-9)
     - [Implementation Steps](#implementation-steps-9)
-      - [10.1 Create Notification Interface](#101-create-notification-interface)
-      - [10.2 Windows Toast Notifications](#102-windows-toast-notifications)
+      - [10.1 Add WinToast Dependency via FetchContent](#101-add-wintoast-dependency-via-fetchcontent)
+      - [10.2 Create Notification Interface](#102-create-notification-interface)
+      - [10.3 Create Windows Toast Notification Implementation](#103-create-windows-toast-notification-implementation)
+      - [10.4 Update Platform CMakeLists.txt](#104-update-platform-cmakeliststxt)
+      - [10.5 AppController Integration](#105-appcontroller-integration)
+      - [10.6 Settings Dialog UI](#106-settings-dialog-ui)
+      - [10.7 Update Source CMakeLists.txt](#107-update-source-cmakeliststxt)
+    - [Test Requirements](#test-requirements-9)
+      - [Unit Tests](#unit-tests-7)
+        - [`tests/unit/test_notification.cpp` (new file)](#testsunittest_notificationcpp-new-file)
+        - [`tests/unit/test_config_manager.cpp` (updated)](#testsunittest_config_managercpp-updated)
+      - [UI Tests](#ui-tests-2)
+        - [`tests/ui/test_settings_dialog.cpp` (updated)](#testsuitest_settings_dialogcpp-updated)
+      - [Verification Criteria](#verification-criteria-8)
+      - [Validation Commands](#validation-commands-1)
     - [Deliverables](#deliverables-9)
   - [Stage 11: Do Not Disturb Detection](#stage-11-do-not-disturb-detection)
     - [Goal](#goal-10)
@@ -169,9 +182,9 @@
       - [12.2 Integration Tests](#122-integration-tests)
       - [12.3 Performance Testing](#123-performance-testing)
       - [12.4 Final Polish](#124-final-polish)
-    - [Test Requirements](#test-requirements-9)
+    - [Test Requirements](#test-requirements-10)
       - [Integration Tests](#integration-tests)
-      - [Verification Criteria](#verification-criteria-8)
+      - [Verification Criteria](#verification-criteria-9)
     - [Deliverables](#deliverables-11)
   - [Appendix A: Testing Commands Reference](#appendix-a-testing-commands-reference)
   - [Appendix B: Code Quality Commands](#appendix-b-code-quality-commands)
@@ -1174,6 +1187,15 @@ Updated `OnOpenSettings()` in `app_controller.cpp` to:
 - Bind idle settings from config when opening dialog
 - Parse and validate idle settings on save
 
+#### 9.5 Selective Timer Reset
+
+Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
+
+- Only recreate and reset timers when the break `interval` actually changes.
+- Preserve running timers when non-timer settings (overlay opacity, messages, idle config, snooze duration) are updated.
+- Recreate only the `snooze_timer_` if the snooze duration changes, without disturbing the main break timers.
+- Preserve the `is_running_` state (Paused/Started) after a configuration update that triggers a reset.
+
 #### 9A. Light and Dark Theme Support
 
 Added `ThemeConfig` to `src/core/config_types.hpp` and wired `theme.follow_system` / `theme.dark_mode` through `src/core/config_manager.cpp` plus `resources/config/default_config.json` so theme preferences persist with the rest of the app configuration.
@@ -1222,15 +1244,6 @@ Manual validation after the fix:
 - Re-ran `blinkbreak.exe` against the roaming config for multiple 10-second short-break cycles.
 - Observed three consecutive short breaks complete successfully with overlays shown on all monitors, including the portrait display.
 - Verified rotating short-break messages continued to advance and the process no longer crashed during overlay display.
-
-#### 9.5 Selective Timer Reset
-
-Updated `BreakScheduler::UpdateConfig()` in `src/core/break_scheduler.cpp` to:
-
-- Only recreate and reset timers when the break `interval` actually changes.
-- Preserve running timers when non-timer settings (overlay opacity, messages, idle config, snooze duration) are updated.
-- Recreate only the `snooze_timer_` if the snooze duration changes, without disturbing the main break timers.
-- Preserve the `is_running_` state (Paused/Started) after a configuration update that triggers a reset.
 
 ### Test Requirements
 
@@ -1347,39 +1360,407 @@ Migrate the configuration system from RapidJSON to Glaze for improved performanc
 
 ### Goal
 
-Implement native OS notifications for pre-break warnings.
+Implement native Windows toast notifications for pre-break warnings using the **WinToast** library. The notifications appear before a break starts (configurable warning time) and include interactive action buttons so the user can **Skip** or **Snooze** the upcoming break directly from the toast, without needing to interact with the overlay.
+
+Focus on quality of final result. Add additional unit and UI tests and validate the result by running tests. Run the app on your own to validate that it works. Update your progress in AGENTS.md.
+
+Key requirements:
+
+- Two action buttons on every notification: **Skip break** and **Snooze break**.
+- Notification respects the system dark/light theme automatically (Windows toast notifications inherit the OS theme by default; no custom XML theming is required).
+- Honour the `NotificationConfig.respect_dnd` flag — suppress notifications when Focus Assist / DND is active (preparation for Stage 11).
+- Notification `warning_time` is configurable from the Settings dialog and persisted in `config.json`.
+- WinToast is integrated via CMake `FetchContent` as the notification backend.
 
 ### Prerequisites
 
-- Stage 9 completed successfully
+- Stage 9 (including 9C) completed successfully.
+- All 158 tests pass (136 unit + 22 UI).
 
 ### Implementation Steps
 
-#### 10.1 Create Notification Interface
+#### 10.1 Add WinToast Dependency via FetchContent
 
-```cpp
-/// @brief Interface for notifications.
-class INotification {
-public:
-    virtual ~INotification() = default;
+Update the root `CMakeLists.txt` to fetch WinToast:
 
-    virtual bool Show(const std::string& title,
-                      const std::string& message) = 0;
-    virtual void Hide() = 0;
-    virtual void SetOnClick(std::function<void()> callback) = 0;
-};
+```cmake
+# Fetch WinToast
+if(EXISTS "${CMAKE_BINARY_DIR}/_deps/wintoast-src/CMakeLists.txt")
+    set(FETCHCONTENT_SOURCE_DIR_WINTOAST "${CMAKE_BINARY_DIR}/_deps/wintoast-src")
+endif()
+FetchContent_Declare(
+    wintoast
+    GIT_REPOSITORY https://github.com/mohabouje/WinToast.git
+    GIT_TAG v1.3.2
+)
+FetchContent_MakeAvailable(wintoast)
 ```
 
-#### 10.2 Windows Toast Notifications
+Because WinToast does not provide its own CMake target, create a small INTERFACE library in the root `CMakeLists.txt` right after `FetchContent_MakeAvailable(wintoast)`:
 
-Implement using Windows Toast API or simple balloon notifications.
+```cmake
+if(NOT TARGET WinToast::WinToast)
+    add_library(WinToast INTERFACE)
+    add_library(WinToast::WinToast ALIAS WinToast)
+    target_include_directories(WinToast INTERFACE
+        ${wintoast_SOURCE_DIR}/src
+    )
+    target_sources(WinToast INTERFACE
+        ${wintoast_SOURCE_DIR}/src/wintoastlib.cpp
+    )
+endif()
+```
+
+> **Note:** If the latest WinToast release tag differs from `v1.3.0`, use the most recent release tag. Check [WinToast releases](https://github.com/mohabouje/WinToast/releases).
+
+#### 10.2 Create Notification Interface
+
+Add the `INotificationManager` interface to `src/platform/platform_interface.hpp` inside `namespace blinkbreak::platform`, following the existing pattern of `IIdleDetector` and `IMonitorManager`.
+
+```cpp
+/// @brief Describes the user's response to a toast notification.
+enum class NotificationAction {
+    Clicked,    ///< User clicked the notification body.
+    Dismissed,  ///< User dismissed or notification timed out.
+    SkipBreak,  ///< User clicked the "Skip" action button.
+    SnoozeBreak ///< User clicked the "Snooze" action button.
+};
+
+/// @brief Interface for managing OS toast notifications.
+class INotificationManager {
+public:
+    virtual ~INotificationManager() = default;
+
+    /// @brief Initializes the notification backend.
+    /// Must be called from the main (STA) thread after COM is initialized.
+    /// @return True if initialization succeeded.
+    virtual bool Initialize() = 0;
+
+    /// @brief Shows a toast notification with action buttons.
+    /// @param title   The notification title (first line).
+    /// @param message The notification body text (second line).
+    /// @return A non-negative toast ID on success, or -1 on failure.
+    virtual int64_t Show(const std::string& title,
+                         const std::string& message) = 0;
+
+    /// @brief Hides (dismisses) a previously shown notification.
+    /// @param toast_id The ID returned by Show().
+    virtual void Hide(int64_t toast_id) = 0;
+
+    /// @brief Sets the callback for notification action events.
+    /// The callback receives the NotificationAction describing what
+    /// the user did with the toast.
+    /// @param callback The callback function.
+    virtual void SetOnAction(
+        std::function<void(NotificationAction)> callback) = 0;
+
+    /// @brief Checks whether the notification backend is available.
+    /// @return True if the system supports toast notifications.
+    [[nodiscard]] virtual bool IsSupported() const = 0;
+};
+
+/// @brief Factory function for creating the platform notification manager.
+/// @return A unique_ptr to the platform-specific INotificationManager.
+std::unique_ptr<INotificationManager> CreateNotificationManager();
+```
+
+#### 10.3 Create Windows Toast Notification Implementation
+
+Create `src/platform/windows/notification_win.hpp`:
+
+```cpp
+/// @file notification_win.hpp
+/// @brief Windows toast notification implementation using WinToast.
+
+#ifndef BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
+#define BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
+
+#include <cstdint>
+#include <functional>
+#include <mutex>
+#include <string>
+
+#include "platform/platform_interface.hpp"
+
+namespace blinkbreak::platform {
+
+/// @brief Windows implementation of INotificationManager using WinToast.
+class NotificationManagerWin : public INotificationManager {
+public:
+    NotificationManagerWin();
+    ~NotificationManagerWin() override;
+
+    // Non-copyable, non-movable
+    NotificationManagerWin(const NotificationManagerWin&) = delete;
+    NotificationManagerWin& operator=(const NotificationManagerWin&) = delete;
+    NotificationManagerWin(NotificationManagerWin&&) = delete;
+    NotificationManagerWin& operator=(NotificationManagerWin&&) = delete;
+
+    bool Initialize() override;
+    int64_t Show(const std::string& title,
+                 const std::string& message) override;
+    void Hide(int64_t toast_id) override;
+    void SetOnAction(
+        std::function<void(NotificationAction)> callback) override;
+    [[nodiscard]] bool IsSupported() const override;
+
+private:
+    bool initialized_ = false;
+    std::function<void(NotificationAction)> on_action_;
+    mutable std::mutex mutex_;
+};
+
+}  // namespace blinkbreak::platform
+
+#endif  // BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
+```
+
+Create `src/platform/windows/notification_win.cpp`:
+
+Key implementation details:
+
+1. **WinToast singleton configuration:**
+   - Set `AppName` to `L"BlinkBreak"`.
+   - Set `AppUserModelId` via `WinToast::configureAUMI(L"BlinkBreak", L"BlinkBreak", L"BreakReminder", L"1.0")`.
+
+2. **COM initialization caution:**
+   - Slint initializes COM as STA on the main thread. WinToast also calls `CoInitializeEx`. If WinToast is initialized _after_ Slint has already set STA, the second `CoInitializeEx(nullptr, COINIT_MULTITHREADED)` call will return `RPC_E_CHANGED_MODE`.
+   - **Workaround:** Call `WinToast::instance()->initialize()` from the **main thread** _after_ Slint's event loop has started (i.e., from within `slint::invoke_from_event_loop` or from `AppController::Initialize()` after the main window is created). WinToast's internal `CoInitializeEx` will succeed as a nested STA call (returns `S_FALSE` which is fine).
+   - **Alternative:** If WinToast still fails with `RPC_E_CHANGED_MODE`, patch the call by pre-initializing COM as `COINIT_APARTMENTTHREADED` before Slint starts, or skip WinToast's internal COM init by wrapping its initialize in a try/catch. See conversation `18d155af-e3ac-4ab7-87a0-4de8f2eb96aa` for details.
+
+3. **Toast template:**
+   - Use `WinToastTemplate::Text02` (title + body, no image).
+   - Add two actions: `L"Skip break"` (index 0) and `L"Snooze break"` (index 1).
+   - Set `Duration` to `WinToastTemplate::Duration::Short` for pre-break warnings.
+
+4. **Event handler:**
+   - Create an inner class `BlinkBreakToastHandler : public WinToastLib::IWinToastHandler`.
+   - `toastActivated()` (no-arg version) → invoke callback with `NotificationAction::Clicked`.
+   - `toastActivated(int actionIndex)` → map index 0 → `NotificationAction::SkipBreak`, index 1 → `NotificationAction::SnoozeBreak`.
+   - `toastDismissed(WinToastDismissalReason)` → invoke callback with `NotificationAction::Dismissed`.
+   - `toastFailed()` → log error via spdlog, no callback.
+   - **Thread safety:** WinToast invokes handler callbacks on a COM worker thread, not the main thread. The handler must capture a `std::shared_ptr` to the callback and use `slint::invoke_from_event_loop` (or post to a thread-safe queue) to relay actions back to the main thread.
+
+5. **Show method:**
+   - Creates a `WinToastTemplate`, sets fields and actions, calls `WinToast::instance()->showToast(templ, handler, &error)`.
+   - Returns the toast ID (or -1 on failure).
+
+6. **Hide method:**
+   - Calls `WinToast::instance()->hideToast(toast_id)`.
+
+7. **IsSupported method:**
+   - Returns `WinToastLib::WinToast::isCompatible()`.
+
+8. **Factory function:**
+   - Implement `CreateNotificationManager()` to return `std::make_unique<NotificationManagerWin>()`.
+
+#### 10.4 Update Platform CMakeLists.txt
+
+Update `src/platform/CMakeLists.txt` to add the new source files and link WinToast:
+
+```cmake
+# Inside the if(WIN32) block, add to target_sources:
+    windows/notification_win.hpp
+    windows/notification_win.cpp
+
+# Add WinToast as a dependency:
+target_link_libraries(blinkbreak_platform
+    PRIVATE
+        shell32
+        Shcore
+        WinToast::WinToast
+)
+```
+
+Also add `runtimeobject` to the Win32 link libraries if not already present (required by WinToast for `Windows.UI.Notifications`):
+
+```cmake
+target_link_libraries(blinkbreak_platform
+    PRIVATE
+        shell32
+        Shcore
+        WinToast::WinToast
+        runtimeobject
+)
+```
+
+#### 10.5 AppController Integration
+
+Update `src/ui/app_controller.hpp`:
+
+- Add `#include <cstdint>` if not present.
+- Add forward declaration: `namespace platform { class INotificationManager; }`.
+- Add private member: `std::unique_ptr<platform::INotificationManager> notification_manager_;`.
+- Add private member: `int64_t active_toast_id_ = -1;` to track the currently shown notification.
+- Add private method: `void OnNotificationAction(platform::NotificationAction action);`.
+- Add private method: `void ShowPreBreakNotification(BreakType type);`.
+
+Update `src/ui/app_controller.cpp`:
+
+1. **In `Initialize()`:**
+   - Create notification manager: `notification_manager_ = platform::CreateNotificationManager();`.
+   - Initialize it: `notification_manager_->Initialize();` (must run on main thread after Slint's COM init).
+   - Set the action callback:
+
+     ```cpp
+     notification_manager_->SetOnAction(
+         [this](platform::NotificationAction action) {
+             // This callback arrives from a COM thread — relay to main thread
+             slint::invoke_from_event_loop([this, action] {
+                 OnNotificationAction(action);
+             });
+         });
+     ```
+
+   - Wire the scheduler's warning callback:
+
+     ```cpp
+     scheduler_->SetOnWarning(
+         [this](BreakType type, const std::string& /*msg*/) {
+             slint::invoke_from_event_loop([this, type] {
+                 ShowPreBreakNotification(type);
+             });
+         },
+         config_.notification.warning_time
+     );
+     ```
+
+2. **`ShowPreBreakNotification(BreakType type)` implementation:**
+   - Guard: if `!config_.notification.enabled` → return.
+   - Guard: if `notification_manager_ && !notification_manager_->IsSupported()` → return.
+   - Compose the title: `"Short break in X seconds"` or `"Long break in X seconds"` (use `config_.notification.warning_time` for X).
+   - Compose the body message from the scheduler's message provider.
+   - Call `active_toast_id_ = notification_manager_->Show(title, body);`.
+
+3. **`OnNotificationAction(NotificationAction action)` implementation:**
+   - `NotificationAction::SkipBreak` → call `OnSkip()`.
+   - `NotificationAction::SnoozeBreak` → call `OnSnooze()`.
+   - `NotificationAction::Clicked` → log and optionally show the main window.
+   - `NotificationAction::Dismissed` → log, no action.
+   - Reset `active_toast_id_ = -1;`.
+
+4. **In break-start handler:**
+   - When the overlay starts (break begins), auto-dismiss any lingering notification: if `active_toast_id_ >= 0`, call `notification_manager_->Hide(active_toast_id_)` and reset to -1.
+
+5. **In `OnOpenSettings()` and settings save handler:**
+   - Bind `notification.enabled`, `notification.warning_time`, and `notification.respect_dnd` to/from the Settings dialog.
+   - On save, update the scheduler's warning callback time if `warning_time` changed:
+
+     ```cpp
+     scheduler_->SetOnWarning(/* same callback */, config_.notification.warning_time);
+     ```
+
+#### 10.6 Settings Dialog UI
+
+Update `ui/components/settings_dialog.slint` to add notification settings:
+
+- Add properties:
+  - `in-out property <bool> notification-enabled: true;`
+  - `in-out property <int> notification-warning-seconds: 30;`
+  - `in-out property <bool> notification-respect-dnd: true;`
+
+- Add a "Notifications" section in the dialog layout with:
+  - Toggle button: "Notifications" → Enabled / Disabled (bound to `notification-enabled`).
+  - Number input: "Warning time (seconds)" (bound to `notification-warning-seconds`). Validate range 5–300.
+  - Toggle button: "Respect DND" → Yes / No (bound to `notification-respect-dnd`).
+
+#### 10.7 Update Source CMakeLists.txt
+
+Update `src/CMakeLists.txt` — no changes needed if notifications are purely in `blinkbreak_platform`. If a higher-level `notification_manager` wrapper is created in `src/ui/`, add it to the `blinkbreak_ui` target.
+
+### Test Requirements
+
+#### Unit Tests
+
+##### `tests/unit/test_notification.cpp` (new file)
+
+Create a **MockNotificationManager** implementing `INotificationManager` for unit testing, and test:
+
+1. **MockNotificationManager_InitialState** — `IsSupported()` returns true by default, `Initialize()` returns true.
+2. **MockNotificationManager_ShowReturnsId** — `Show()` returns an incrementing non-negative ID.
+3. **MockNotificationManager_HideDoesNotThrow** — `Hide()` with a valid and invalid ID does not throw.
+4. **MockNotificationManager_ActionCallback** — Setting and invoking the action callback works; verify each `NotificationAction` variant is dispatched.
+5. **MockNotificationManager_ShowWithEmptyStrings** — `Show("", "")` handles empty strings gracefully (returns valid ID, no crash).
+6. **MockNotificationManager_ShowAfterInitialize** — Calling `Show` without `Initialize()` returns -1.
+7. **MockNotificationManager_MultipleShowCalls** — Multiple `Show()` calls return distinct IDs.
+8. **MockNotificationManager_SetActionCallbackOverwrite** — Setting a new action callback replaces the previous one.
+9. **NotificationManagerWin_Create** — `CreateNotificationManager()` returns a non-null pointer.
+10. **NotificationManagerWin_IsCompatible** — On a compatible Windows 10+ system, `IsSupported()` returns true.
+11. **NotificationManagerWin_InitializeSucceeds** — `Initialize()` returns true on a supported system (requires COM on main thread).
+12. **NotificationManagerWin_ShowAndHide** — Shows a real toast, verifies non-negative ID, then hides it (live test, may need `[Manual]` tag).
+
+##### `tests/unit/test_config_manager.cpp` (updated)
+
+- **NotificationConfigDefaults** — Verify default values: `enabled = true`, `warning_time = 30s`, `respect_dnd = true`.
+- **NotificationConfigParsesFromJson** — Parse a JSON snippet with custom notification settings and verify round-trip.
+
+#### UI Tests
+
+##### `tests/ui/test_settings_dialog.cpp` (updated)
+
+- **NotificationSettingsDefaults** — Verify `notification-enabled` is true, `notification-warning-seconds` is 30 (or the chosen default), `notification-respect-dnd` is true.
+- **NotificationSettingsRoundTrip** — Toggle `notification-enabled` off, set `notification-warning-seconds` to 60, toggle `notification-respect-dnd` off, and verify the values persist after re-reading.
+
+#### Verification Criteria
+
+- [x] WinToast FetchContent integration compiles without errors.
+- [x] `cmake --preset=debug --fresh` configures successfully.
+- [x] `cmake --build --preset=debug` builds successfully.
+- [x] All Stage 9 tests still pass.
+- [x] All new notification unit tests pass (12 tests).
+- [x] All new/updated config tests pass.
+- [x] All new/updated UI tests pass.
+- [x] `ctest --preset=debug --output-on-failure` passes all tests.
+- [ ] Manual validation: Run `blinkbreak.exe` with `short_break.interval=15s`, `notification.enabled=true`, `notification.warning_time=5s`. Verify:
+  - A toast notification appears 5 seconds before the break.
+  - The toast contains the correct title and body text.
+  - Clicking "Skip break" on the toast skips the break (no overlay appears).
+  - Clicking "Snooze break" on the toast snoozes the break.
+  - If the toast is ignored, the overlay appears normally after warning_time expires.
+  - The toast is auto-dismissed when the overlay appears.
+- [ ] Manual validation: Disable notifications in Settings and verify no toast appears before breaks.
+- [x] No COM `RPC_E_CHANGED_MODE` errors in logs.
+- [ ] Application exits cleanly with no WinToast-related resource leaks.
+
+#### Validation Commands
+
+```bash
+cmake --preset=debug --fresh
+cmake --build --preset=debug
+ctest --preset=debug --output-on-failure
+build/debug/src/Debug/blinkbreak.exe --version
+build/debug/src/Debug/blinkbreak.exe
+```
+
+Validation results:
+
+- `cmake --preset=debug --fresh`: configured successfully.
+- `cmake --build --preset=debug`: build succeeded (MSVC/Slint warnings present).
+- `ctest --preset=debug --output-on-failure`: 174 tests passed, 1 skipped (`NotificationManagerWinShowAndHide`).
+- `build/debug/src/Debug/blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0".
+- `build/debug/src/Debug/blinkbreak.exe`: ran successfully; toast appeared before break, no `RPC_E_CHANGED_MODE` panic observed.
 
 ### Deliverables
 
-- [x] Notification interface
-- [x] Windows implementation
-- [x] Pre-break warnings
-- [x] Integration with scheduler
+- [x] WinToast integrated via FetchContent in root `CMakeLists.txt`
+- [x] `INotificationManager` interface in `src/platform/platform_interface.hpp`
+- [x] `NotificationManagerWin` implementation in `src/platform/windows/notification_win.hpp/cpp`
+- [x] `CreateNotificationManager()` factory function
+- [x] `BlinkBreakToastHandler` inner class implementing `IWinToastHandler`
+- [x] Two action buttons on every toast: "Skip break" and "Snooze break"
+- [x] Platform `CMakeLists.txt` updated with new sources and WinToast linkage
+- [x] `AppController` integration: pre-break warning flow, action relay via `slint::invoke_from_event_loop`
+- [x] Auto-dismiss of lingering notification when overlay starts
+- [x] Settings dialog: notification enabled toggle, warning time input, respect DND toggle
+- [x] NotificationConfig defaults updated in `config_types.hpp` (warning_time default = 30s)
+- [x] `default_config.json` updated with notification section
+- [x] Unit tests for notification manager (12 new tests)
+- [x] Config manager test updates (2 new/extended tests)
+- [x] UI tests for notification settings (2 new tests)
+- [x] All tests pass
+- [ ] Manual runtime validation completed
+- [ ] COM initialization compatible with Slint (no `RPC_E_CHANGED_MODE`)
+- [x] Code compiles without errors
 
 ---
 
@@ -1591,7 +1972,7 @@ This implementation plan provides a comprehensive 12-stage roadmap for building 
 | 7B    | Stability/Assets  | -           | 99           |
 | 8     | Multi-Monitor     | 27          | 126 (unit)   |
 | 9     | Idle Detection    | 22          | 145 (126+19) |
-| 10    | Notifications     | 3           | -            |
+| 10    | Notifications     | 16          | -            |
 | 11    | DND Detection     | 2           | -            |
 | 12    | Integration       | 10+         | 160+         |
 

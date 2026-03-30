@@ -5,6 +5,7 @@
 #define BLINKBREAK_PLATFORM_INTERFACE_HPP
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -179,6 +180,51 @@ public:
 /// @brief Creates platform-specific idle detector implementation.
 /// @return Unique pointer to the idle detector implementation.
 std::unique_ptr<IIdleDetector> CreateIdleDetector();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @brief Describes the user's response to a toast notification.
+enum class NotificationAction {
+    Clicked,    ///< User clicked the notification body.
+    Dismissed,  ///< User dismissed or notification timed out.
+    SkipBreak,  ///< User clicked the "Skip break" action button.
+    SnoozeBreak ///< User clicked the "Snooze break" action button.
+};
+
+/// @brief Interface for managing OS toast notifications.
+class INotificationManager {
+public:
+    virtual ~INotificationManager() = default;
+
+    /// @brief Initializes the notification backend.
+    /// Must be called from the main (STA) thread after COM is initialized.
+    /// @return True if initialization succeeded.
+    virtual bool Initialize() = 0;
+
+    /// @brief Shows a toast notification with action buttons.
+    /// @param title The notification title (first line).
+    /// @param message The notification body text (second line).
+    /// @return A non-negative toast ID on success, or -1 on failure.
+    virtual int64_t Show(const std::string& title, const std::string& message) = 0;
+
+    /// @brief Hides (dismisses) a previously shown notification.
+    /// @param toast_id The ID returned by Show().
+    virtual void Hide(int64_t toast_id) = 0;
+
+    /// @brief Sets the callback for notification action events.
+    /// @param callback The callback function.
+    virtual void SetOnAction(std::function<void(NotificationAction)> callback) = 0;
+
+    /// @brief Checks whether the notification backend is available.
+    /// @return True if the system supports toast notifications.
+    [[nodiscard]] virtual bool IsSupported() const = 0;
+};
+
+/// @brief Factory function for creating the platform notification manager.
+/// @return A unique_ptr to the platform-specific INotificationManager.
+std::unique_ptr<INotificationManager> CreateNotificationManager();
 
 }  // namespace platform
 }  // namespace blinkbreak

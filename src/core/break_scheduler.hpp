@@ -119,6 +119,11 @@ public:
     /// @return The type of the next scheduled break.
     [[nodiscard]] BreakType GetNextBreakType() const;
 
+    /// @brief Gets the upcoming message for the specified break type.
+    /// @param type The break type.
+    /// @return The next message without advancing the rotation.
+    [[nodiscard]] std::string GetUpcomingMessage(BreakType type) const;
+
     /// @brief Checks if a break is currently active.
     /// @return True if a break is active.
     [[nodiscard]] bool IsBreakActive() const;

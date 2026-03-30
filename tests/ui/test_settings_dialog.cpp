@@ -151,5 +151,33 @@ TEST(SettingsDialogUiTest, ThemeSettingsRoundTrip) {
     EXPECT_FALSE(dialog->get_dark_mode_enabled());
 }
 
+/// @test Verifies notification settings defaults.
+TEST(SettingsDialogUiTest, NotificationSettingsDefaults) {
+    auto dialog = SettingsDialog::create();
+
+    EXPECT_TRUE(dialog->get_notification_enabled());
+    EXPECT_EQ(ToStdString(dialog->get_notification_warning_seconds()), "30");
+    EXPECT_TRUE(dialog->get_notification_respect_dnd());
+}
+
+/// @test Verifies notification settings round-trip.
+TEST(SettingsDialogUiTest, NotificationSettingsRoundTrip) {
+    auto dialog = SettingsDialog::create();
+
+    dialog->set_notification_enabled(false);
+    dialog->set_notification_warning_seconds("60");
+    dialog->set_notification_respect_dnd(false);
+
+    EXPECT_FALSE(dialog->get_notification_enabled());
+    EXPECT_EQ(ToStdString(dialog->get_notification_warning_seconds()), "60");
+    EXPECT_FALSE(dialog->get_notification_respect_dnd());
+
+    dialog->set_notification_enabled(true);
+    dialog->set_notification_respect_dnd(true);
+
+    EXPECT_TRUE(dialog->get_notification_enabled());
+    EXPECT_TRUE(dialog->get_notification_respect_dnd());
+}
+
 }  // namespace
 }  // namespace blinkbreak::ui_test

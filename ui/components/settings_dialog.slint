@@ -67,6 +67,11 @@ export component SettingsDialog inherits Window {
     in-out property <bool> theme-follow-system: true;
     in-out property <bool> theme-dark-mode: false;
 
+    // Notification settings
+    in-out property <bool> notification-enabled: true;
+    in-out property <string> notification-warning-seconds: "30";
+    in-out property <bool> notification-respect-dnd: true;
+
     // Idle detection settings
     in-out property <bool> idle-enabled: true;
     in-out property <string> idle-threshold-minutes: "3";
@@ -227,6 +232,53 @@ export component SettingsDialog inherits Window {
                     Switch {
                         checked <=> root.theme-dark-mode;
                         enabled: !root.theme-follow-system;
+                    }
+                }
+
+                Text {
+                    text: "Notifications";
+                    font-size: 14px;
+                    font-weight: 600;
+                    color: Palette.foreground;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Enable notifications";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.notification-enabled;
+                    }
+                }
+
+                NumberFieldRow {
+                    label: "Warning time";
+                    unit: "seconds";
+                    value <=> root.notification-warning-seconds;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Respect DND";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.notification-respect-dnd;
                     }
                 }
 

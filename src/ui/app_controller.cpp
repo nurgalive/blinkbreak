@@ -14,6 +14,7 @@
 
 #ifdef _WIN32
     #include <windows.h>
+    #include <shellapi.h>
 #endif
 
 #include "main_window.h"
@@ -64,6 +65,28 @@ HWND FindWindowByTitle(const wchar_t* title) {
     }
     return hwnd;
 }
+
+bool IsDndActive() {
+    QUERY_USER_NOTIFICATION_STATE state = QUNS_ACCEPTS_NOTIFICATIONS;
+    const HRESULT result = SHQueryUserNotificationState(&state);
+    if (FAILED(result)) {
+        spdlog::debug("SHQueryUserNotificationState failed: 0x{:08x}",
+                      static_cast<unsigned int>(result));
+        return false;
+    }
+
+    switch (state) {
+        case QUNS_BUSY:
+        case QUNS_PRESENTATION_MODE:
+        case QUNS_RUNNING_D3D_FULL_SCREEN:
+        case QUNS_QUIET_TIME:
+            return true;
+        case QUNS_ACCEPTS_NOTIFICATIONS:
+        case QUNS_APP:
+        default:
+            return false;
+    }
+}
 #endif
 
 }  // namespace
@@ -79,6 +102,10 @@ AppController::AppController()
       tracked_duration_(Duration::zero()),
       tracked_duration_ms_(DurationMs::zero()),
       skip_in_progress_(false),
+      pending_notification_break_(std::nullopt),
+      pending_notification_action_(std::nullopt),
+      active_toast_id_(-1),
+      current_state_(State::kIdle),
       is_running_(false),
       is_paused_by_idle_(false),
       show_idle_timer_(false),
@@ -138,6 +165,7 @@ bool AppController::Initialize() {
     state_machine_->SetOnStateChange([this](State old_state, State new_state, const Event&) {
         spdlog::info("State: {} -> {}", StateToString(old_state), StateToString(new_state));
         std::lock_guard lock(mutex_);
+        current_state_ = new_state;
         is_running_ = (new_state == State::kRunning || new_state == State::kSnoozed);
     });
 
@@ -173,11 +201,43 @@ bool AppController::Initialize() {
 
     scheduler_->SetOnBreakStart([this](const BreakInfo& info) {
         spdlog::info("Break started: {}", BreakTypeToString(info.type));
-        const auto current_state = state_machine_->GetCurrentState();
+        const auto current_state = GetCurrentStateSnapshot();
         if (current_state == State::kSnoozed) {
             state_machine_->ProcessEvent(SnoozeExpiredEvent{});
         } else {
             state_machine_->ProcessEvent(TimerExpiredEvent{info.type});
+        }
+
+        if (notification_manager_) {
+            int64_t toast_id = -1;
+            {
+                std::lock_guard lock(mutex_);
+                toast_id = active_toast_id_;
+                active_toast_id_ = -1;
+            }
+            if (toast_id >= 0) {
+                notification_manager_->Hide(toast_id);
+            }
+        }
+
+        std::optional<platform::NotificationAction> pending_action;
+        {
+            std::lock_guard lock(mutex_);
+            if (pending_notification_action_ && pending_notification_break_ &&
+                *pending_notification_break_ == info.type) {
+                pending_action = pending_notification_action_;
+                pending_notification_action_.reset();
+                pending_notification_break_.reset();
+            }
+        }
+
+        if (pending_action && *pending_action == platform::NotificationAction::SkipBreak) {
+            slint::invoke_from_event_loop([this]() { OnSkip(); });
+            return;
+        }
+        if (pending_action && *pending_action == platform::NotificationAction::SnoozeBreak) {
+            slint::invoke_from_event_loop([this]() { OnSnooze(); });
+            return;
         }
 
         float overlay_opacity = 0.7f;
@@ -224,17 +284,20 @@ bool AppController::Initialize() {
         }
     });
 
-    if (config_.notification.enabled) {
-        scheduler_->SetOnWarning(
-            [this](BreakType type, Duration time_until) {
-                spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
-                             time_until.count());
-                if (tray_manager_) {
-                    tray_manager_->UpdateStatus(is_running_, time_until, type);
-                }
-            },
-            config_.notification.warning_time);
-    }
+    const auto warning_time = config_.notification.enabled ? config_.notification.warning_time
+                                                            : Duration::zero();
+    scheduler_->SetOnWarning(
+        [this](BreakType type, Duration time_until) {
+            spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
+                         time_until.count());
+            if (tray_manager_) {
+                tray_manager_->UpdateStatus(is_running_, time_until, type);
+            }
+            slint::invoke_from_event_loop([this, type, time_until]() {
+                ShowPreBreakNotification(type, time_until);
+            });
+        },
+        warning_time);
 
     // Initialize UI state
     time_until_short_ = FormatDuration(config_.short_break.interval);
@@ -296,6 +359,23 @@ bool AppController::Initialize() {
     ui->set_idle_time(slint::SharedString(idle_time_));
     ApplyThemeProperties(*main_window_, config_.theme);
 
+    // Initialize notification manager
+    notification_manager_ = platform::CreateNotificationManager();
+    if (notification_manager_) {
+        if (notification_manager_->IsSupported()) {
+            if (!notification_manager_->Initialize()) {
+                spdlog::warn("Notification manager initialization failed");
+            }
+        } else {
+            spdlog::warn("Toast notifications are not supported on this system");
+        }
+        notification_manager_->SetOnAction(
+            [this](platform::NotificationAction action) {
+                slint::invoke_from_event_loop(
+                    [this, action]() { OnNotificationAction(action); });
+            });
+    }
+
     // Initialize tray manager
     TrayManager::Callbacks tray_callbacks{
         .on_show_window =
@@ -335,8 +415,8 @@ bool AppController::Initialize() {
         .on_start_pause =
             [this]() {
                 spdlog::debug("Tray: Start/Pause");
-                if (state_machine_->GetCurrentState() == State::kRunning ||
-                    state_machine_->GetCurrentState() == State::kSnoozed) {
+                const auto current_state = GetCurrentStateSnapshot();
+                if (current_state == State::kRunning || current_state == State::kSnoozed) {
                     OnPause();
                 } else {
                     OnStart();
@@ -411,7 +491,7 @@ int AppController::Run() {
 void AppController::OnStart() {
     spdlog::debug("OnStart called");
 
-    const auto current_state = state_machine_->GetCurrentState();
+    const auto current_state = GetCurrentStateSnapshot();
     if (current_state == State::kPaused) {
         auto result = state_machine_->ProcessEvent(ResumeEvent{});
         if (result.success) {
@@ -462,7 +542,7 @@ void AppController::OnPause() {
 void AppController::OnSkip() {
     spdlog::debug("OnSkip called");
 
-    if (state_machine_->GetCurrentState() == State::kBreakActive) {
+    if (GetCurrentStateSnapshot() == State::kBreakActive) {
         {
             std::lock_guard lock(mutex_);
             skip_in_progress_ = true;
@@ -477,7 +557,7 @@ void AppController::OnSkip() {
 void AppController::OnSnooze() {
     spdlog::debug("OnSnooze called");
 
-    if (state_machine_->GetCurrentState() == State::kBreakActive) {
+    if (GetCurrentStateSnapshot() == State::kBreakActive) {
         {
             std::lock_guard scheduler_lock(scheduler_mutex_);
             scheduler_->SnoozeBreak();
@@ -558,6 +638,8 @@ void AppController::OnOpenSettings() {
             const auto long_duration_text = ToStdString(dialog->get_long_duration_seconds());
             const auto snooze_duration_text = ToStdString(dialog->get_snooze_duration_minutes());
             const auto idle_threshold_text = ToStdString(dialog->get_idle_threshold_minutes());
+            const auto notification_warning_text =
+                ToStdString(dialog->get_notification_warning_seconds());
 
             const auto short_interval_minutes = ParsePositiveInt(short_interval_text);
             const auto short_duration_seconds = ParsePositiveInt(short_duration_text);
@@ -565,11 +647,19 @@ void AppController::OnOpenSettings() {
             const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
             const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
             const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
+            const auto notification_warning_seconds =
+                ParsePositiveInt(notification_warning_text);
 
             if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
-                !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes) {
+                !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes ||
+                !notification_warning_seconds) {
                 dialog->set_validation_error(
                     slint::SharedString("All fields must be positive integers."));
+                return;
+            }
+            if (*notification_warning_seconds < 5 || *notification_warning_seconds > 300) {
+                dialog->set_validation_error(
+                    slint::SharedString("Warning time must be between 5 and 300 seconds."));
                 return;
             }
 
@@ -587,6 +677,11 @@ void AppController::OnOpenSettings() {
             updated.overlay.opacity = dialog->get_overlay_opaque() ? 1.0f : 0.7f;
             updated.theme.follow_system = dialog->get_theme_follow_system();
             updated.theme.dark_mode = dialog->get_theme_dark_mode();
+
+            // Update notification config
+            updated.notification.enabled = dialog->get_notification_enabled();
+            updated.notification.warning_time = Duration(*notification_warning_seconds);
+            updated.notification.respect_dnd = dialog->get_notification_respect_dnd();
 
             // Update idle config
             updated.idle.enabled = dialog->get_idle_enabled();
@@ -613,12 +708,40 @@ void AppController::OnOpenSettings() {
                 std::lock_guard lock(mutex_);
                 config_ = updated;
             }
+            if (!updated.notification.enabled && notification_manager_) {
+                int64_t toast_id = -1;
+                {
+                    std::lock_guard lock(mutex_);
+                    toast_id = active_toast_id_;
+                    active_toast_id_ = -1;
+                }
+                if (toast_id >= 0) {
+                    notification_manager_->Hide(toast_id);
+                }
+            }
             bool scheduler_running = false;
             {
                 std::lock_guard scheduler_lock(scheduler_mutex_);
                 if (scheduler_) {
                     scheduler_->UpdateConfig(updated.short_break, updated.long_break,
                                              updated.overlay);
+                    const auto warning_time = updated.notification.enabled
+                                                  ? updated.notification.warning_time
+                                                  : Duration::zero();
+                    scheduler_->SetOnWarning(
+                        [this](BreakType type, Duration time_until) {
+                            spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
+                                         time_until.count());
+                            if (tray_manager_) {
+                                tray_manager_->UpdateStatus(is_running_, time_until, type);
+                            }
+                            slint::invoke_from_event_loop(
+
+                                [this, type, time_until]() {
+                                    ShowPreBreakNotification(type, time_until);
+                                });
+                        },
+                        warning_time);
                     scheduler_running = scheduler_->IsRunning();
                 }
             }
@@ -719,6 +842,12 @@ void AppController::OnOpenSettings() {
     dialog->set_theme_follow_system(snapshot.theme.follow_system);
     dialog->set_theme_dark_mode(snapshot.theme.dark_mode);
 
+    // Bind notification settings
+    dialog->set_notification_enabled(snapshot.notification.enabled);
+    dialog->set_notification_warning_seconds(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.notification.warning_time.count()))));
+    dialog->set_notification_respect_dnd(snapshot.notification.respect_dnd);
+
     // Bind idle settings
     dialog->set_idle_enabled(snapshot.idle.enabled);
     dialog->set_idle_threshold_minutes(slint::SharedString(
@@ -815,6 +944,11 @@ int AppController::GetLongSkippedCount() const {
 std::string AppController::GetStatusText() const {
     std::lock_guard lock(mutex_);
     return status_text_;
+}
+
+State AppController::GetCurrentStateSnapshot() const {
+    std::lock_guard lock(mutex_);
+    return current_state_;
 }
 
 void AppController::TimerThreadFunc() {
@@ -1005,7 +1139,7 @@ void AppController::OnUserIdle() {
     spdlog::info("AppController: User became idle (config: pause_on_idle={}, reset_on_idle={})",
                  should_pause, should_reset);
 
-    const auto current_state = state_machine_->GetCurrentState();
+    const auto current_state = GetCurrentStateSnapshot();
 
     if (should_reset && current_state == State::kRunning) {
         // Reset timers on idle if configured
@@ -1052,7 +1186,7 @@ void AppController::OnUserActive() {
 
     spdlog::info("AppController: User became active (was_paused_by_idle={})", was_paused_by_idle);
 
-    const auto current_state = state_machine_->GetCurrentState();
+    const auto current_state = GetCurrentStateSnapshot();
 
     // Only auto-resume if we paused due to idle
     if (was_paused_by_idle && current_state == State::kPaused) {
@@ -1072,6 +1206,118 @@ void AppController::OnUserActive() {
                 tray_manager_->UpdateMenu(true);
             }
         }
+    }
+}
+
+void AppController::OnNotificationAction(platform::NotificationAction action) {
+    spdlog::info("Notification action: {}", static_cast<int>(action));
+
+    if (action == platform::NotificationAction::Clicked) {
+#ifdef _WIN32
+        HWND hwnd = FindWindowByTitle(L"BlinkBreak");
+        if (hwnd) {
+            ShowWindow(hwnd, SW_SHOW);
+            SetForegroundWindow(hwnd);
+
+            RECT rect;
+            if (GetWindowRect(hwnd, &rect)) {
+                int width = rect.right - rect.left;
+                int height = rect.bottom - rect.top;
+                SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height, SWP_NOMOVE | SWP_NOZORDER);
+                slint::Timer::single_shot(std::chrono::milliseconds(50),
+                                          [hwnd, width, height]() {
+                                              SetWindowPos(hwnd, nullptr, 0, 0, width, height,
+                                                           SWP_NOMOVE | SWP_NOZORDER);
+                                          });
+            }
+        }
+#else
+        if (main_window_) {
+            (*main_window_)->show();
+            (*main_window_)->window().set_minimized(false);
+        }
+#endif
+        if (main_window_) {
+            (*main_window_)->window().request_redraw();
+        }
+    }
+
+    bool handled_immediately = false;
+    if (action == platform::NotificationAction::SkipBreak ||
+        action == platform::NotificationAction::SnoozeBreak) {
+        if (GetCurrentStateSnapshot() == State::kBreakActive) {
+            if (action == platform::NotificationAction::SkipBreak) {
+                OnSkip();
+            } else {
+                OnSnooze();
+            }
+            handled_immediately = true;
+        }
+    }
+
+    {
+        std::lock_guard lock(mutex_);
+        if (action == platform::NotificationAction::SkipBreak ||
+            action == platform::NotificationAction::SnoozeBreak) {
+            if (handled_immediately) {
+                pending_notification_action_.reset();
+                pending_notification_break_.reset();
+            } else {
+                pending_notification_action_ = action;
+            }
+        }
+        if (action == platform::NotificationAction::Dismissed ||
+            action == platform::NotificationAction::Clicked) {
+            pending_notification_action_.reset();
+        }
+        active_toast_id_ = -1;
+    }
+}
+
+void AppController::ShowPreBreakNotification(BreakType type, Duration time_until) {
+    NotificationConfig notification_config;
+    {
+        std::lock_guard lock(mutex_);
+        notification_config = config_.notification;
+        pending_notification_break_ = type;
+        pending_notification_action_.reset();
+    }
+
+    if (!notification_config.enabled) {
+        return;
+    }
+    if (!notification_manager_ || !notification_manager_->IsSupported()) {
+        return;
+    }
+
+    if (notification_config.respect_dnd) {
+        bool dnd_active = false;
+#ifdef _WIN32
+        dnd_active = IsDndActive();
+#endif
+        if (dnd_active) {
+            spdlog::info("Notifications suppressed due to DND/Focus Assist");
+            return;
+        }
+    }
+
+    std::string message;
+    {
+        std::lock_guard scheduler_lock(scheduler_mutex_);
+        if (scheduler_) {
+            message = scheduler_->GetUpcomingMessage(type);
+        }
+    }
+    if (message.empty()) {
+        message = "Time to take a break";
+    }
+
+    const std::string title = std::format("{} break in {} seconds",
+                                          BreakTypeToString(type), time_until.count());
+    const auto toast_id = notification_manager_->Show(title, message);
+    {
+        std::lock_guard lock(mutex_);
+        active_toast_id_ = toast_id;
     }
 }
 

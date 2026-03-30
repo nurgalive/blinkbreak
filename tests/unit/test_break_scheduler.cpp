@@ -402,6 +402,26 @@ TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenEnabledFlagChanges) {
     EXPECT_EQ(*remaining, 5s);
 }
 
+/// @test Enabling a break starts its timer when running.
+TEST_F(BreakSchedulerTest, UpdateConfigStartsLongTimerWhenEnabled) {
+    long_config_.enabled = false;
+    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+
+    scheduler_->Start();
+    scheduler_->Update(5s);  // 5s remain on short timer
+
+    long_config_.enabled = true;
+    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+
+    EXPECT_TRUE(scheduler_->IsRunning());
+    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+    auto long_remaining = scheduler_->GetTimeUntilLongBreak();
+    ASSERT_TRUE(short_remaining.has_value());
+    ASSERT_TRUE(long_remaining.has_value());
+    EXPECT_EQ(*short_remaining, 5s);
+    EXPECT_EQ(*long_remaining, 60s);
+}
+
 /// @test UpdateConfig RESETS timers when the short break interval changes.
 TEST_F(BreakSchedulerTest, UpdateConfigResetsTimersWhenShortIntervalChanges) {
     scheduler_->Start();

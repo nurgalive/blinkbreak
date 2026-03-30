@@ -8,6 +8,7 @@ if(NOT TARGET blinkbreak_tests)
         unit/test_break_scheduler.cpp
         unit/test_monitor_manager.cpp
         unit/test_idle_detector.cpp
+        unit/test_notification.cpp
     )
 
     target_link_libraries(blinkbreak_tests

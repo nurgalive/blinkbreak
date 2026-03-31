@@ -75,6 +75,7 @@ TEST_F(ConfigManagerTest, NotificationConfigDefaults) {
     EXPECT_TRUE(config.notification.enabled);
     EXPECT_EQ(config.notification.warning_time, 30s);
     EXPECT_TRUE(config.notification.respect_dnd);
+    EXPECT_FALSE(config.notification.respect_fullscreen);
 }
 
 /// @test GetDefault configuration passes validation.
@@ -174,7 +175,8 @@ TEST_F(ConfigManagerTest, ParseJsonReadsNotificationConfig) {
         "notification": {
             "enabled": false,
             "warning_seconds": 45,
-            "respect_dnd": false
+            "respect_dnd": false,
+            "respect_fullscreen": true
         }
     })";
 
@@ -184,6 +186,7 @@ TEST_F(ConfigManagerTest, ParseJsonReadsNotificationConfig) {
     EXPECT_FALSE(result->notification.enabled);
     EXPECT_EQ(result->notification.warning_time, 45s);
     EXPECT_FALSE(result->notification.respect_dnd);
+    EXPECT_TRUE(result->notification.respect_fullscreen);
 }
 
 // ============================================================================
@@ -206,6 +209,7 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     original.overlay.opacity = 0.5f;
     original.theme.follow_system = false;
     original.theme.dark_mode = true;
+    original.notification.respect_fullscreen = true;
 
     std::string json = config_manager_->ToJson(original);
     auto parsed = config_manager_->ParseJson(json);
@@ -215,6 +219,7 @@ TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesValues) {
     EXPECT_FLOAT_EQ(parsed->overlay.opacity, 0.5f);
     EXPECT_FALSE(parsed->theme.follow_system);
     EXPECT_TRUE(parsed->theme.dark_mode);
+    EXPECT_TRUE(parsed->notification.respect_fullscreen);
 }
 
 // ============================================================================

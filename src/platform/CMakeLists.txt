@@ -19,6 +19,8 @@ if(WIN32)
             windows/idle_detector_win.cpp
             windows/notification_win.hpp
             windows/notification_win.cpp
+            windows/dnd_detector_win.hpp
+            windows/dnd_detector_win.cpp
     )
 endif()
 

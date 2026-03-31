@@ -68,9 +68,10 @@ ConfigResult<void> ConfigManager::Save(const AppConfig& config, const std::files
     std::string buffer;
     auto error = glz::write_file_json(config, path.string(), buffer);
     if (error) {
-        return std::unexpected(
-            ConfigError{.message = "Failed to save configuration (error code: " + std::to_string(static_cast<int>(error.ec)) + ")",
-                        .field = path.string()});
+        return std::unexpected(ConfigError{.message = "Failed to save configuration (error code: " +
+                                                      std::to_string(static_cast<int>(error.ec)) +
+                                                      ")",
+                                           .field = path.string()});
     }
 
     spdlog::debug("Configuration saved successfully");
@@ -143,6 +144,7 @@ AppConfig ConfigManager::GetDefault() {
     config.notification.enabled = true;
     config.notification.warning_time = Duration(30);
     config.notification.respect_dnd = true;
+    config.notification.respect_fullscreen = false;
 
     config.theme.follow_system = true;
     config.theme.dark_mode = false;
@@ -196,7 +198,14 @@ ConfigResult<AppConfig> ConfigManager::ParseJson(const std::string& json_string)
 }
 
 std::string ConfigManager::ToJson(const AppConfig& config) const {
-    return glz::write_json(config);
+    auto json = glz::write_json(config);
+    if (!json) {
+        spdlog::error("Failed to serialize configuration to JSON (error code: {})",
+                      static_cast<int>(json.error().ec));
+        return {};
+    }
+
+    return std::move(json).value();
 }
 
 std::vector<ConfigError> ConfigManager::ValidateBreakConfig(const BreakConfig& config,

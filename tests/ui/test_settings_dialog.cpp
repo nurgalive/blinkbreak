@@ -158,6 +158,7 @@ TEST(SettingsDialogUiTest, NotificationSettingsDefaults) {
     EXPECT_TRUE(dialog->get_notification_enabled());
     EXPECT_EQ(ToStdString(dialog->get_notification_warning_seconds()), "30");
     EXPECT_TRUE(dialog->get_notification_respect_dnd());
+    EXPECT_FALSE(dialog->get_notification_respect_fullscreen());
 }
 
 /// @test Verifies notification settings round-trip.
@@ -167,16 +168,20 @@ TEST(SettingsDialogUiTest, NotificationSettingsRoundTrip) {
     dialog->set_notification_enabled(false);
     dialog->set_notification_warning_seconds("60");
     dialog->set_notification_respect_dnd(false);
+    dialog->set_notification_respect_fullscreen(true);
 
     EXPECT_FALSE(dialog->get_notification_enabled());
     EXPECT_EQ(ToStdString(dialog->get_notification_warning_seconds()), "60");
     EXPECT_FALSE(dialog->get_notification_respect_dnd());
+    EXPECT_TRUE(dialog->get_notification_respect_fullscreen());
 
     dialog->set_notification_enabled(true);
     dialog->set_notification_respect_dnd(true);
+    dialog->set_notification_respect_fullscreen(false);
 
     EXPECT_TRUE(dialog->get_notification_enabled());
     EXPECT_TRUE(dialog->get_notification_respect_dnd());
+    EXPECT_FALSE(dialog->get_notification_respect_fullscreen());
 }
 
 }  // namespace

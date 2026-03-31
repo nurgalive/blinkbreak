@@ -32,7 +32,8 @@
   "notification": {
     "enabled": true,
     "warning_seconds": 30,
-    "respect_dnd": true
+    "respect_dnd": true,
+    "respect_fullscreen": false
   },
   "theme": {
     "follow_system": true,

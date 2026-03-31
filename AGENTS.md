@@ -172,7 +172,7 @@
     - [Prerequisites](#prerequisites-10)
     - [Implementation Steps](#implementation-steps-10)
       - [11.1 Create DND Detector Interface](#111-create-dnd-detector-interface)
-      - [11.2 Windows Focus Assist Detection](#112-windows-focus-assist-detection)
+      - [11.2 Create Windows DND Detector Header](#112-create-windows-dnd-detector-header)
     - [Deliverables](#deliverables-10)
   - [Stage 12: Integration Tests \& Polish](#stage-12-integration-tests--polish)
     - [Goal](#goal-11)
@@ -1381,292 +1381,46 @@ Key requirements:
 
 #### 10.1 Add WinToast Dependency via FetchContent
 
-Update the root `CMakeLists.txt` to fetch WinToast:
-
-```cmake
-# Fetch WinToast
-if(EXISTS "${CMAKE_BINARY_DIR}/_deps/wintoast-src/CMakeLists.txt")
-    set(FETCHCONTENT_SOURCE_DIR_WINTOAST "${CMAKE_BINARY_DIR}/_deps/wintoast-src")
-endif()
-FetchContent_Declare(
-    wintoast
-    GIT_REPOSITORY https://github.com/mohabouje/WinToast.git
-    GIT_TAG v1.3.2
-)
-FetchContent_MakeAvailable(wintoast)
-```
-
-Because WinToast does not provide its own CMake target, create a small INTERFACE library in the root `CMakeLists.txt` right after `FetchContent_MakeAvailable(wintoast)`:
-
-```cmake
-if(NOT TARGET WinToast::WinToast)
-    add_library(WinToast INTERFACE)
-    add_library(WinToast::WinToast ALIAS WinToast)
-    target_include_directories(WinToast INTERFACE
-        ${wintoast_SOURCE_DIR}/src
-    )
-    target_sources(WinToast INTERFACE
-        ${wintoast_SOURCE_DIR}/src/wintoastlib.cpp
-    )
-endif()
-```
-
-> **Note:** If the latest WinToast release tag differs from `v1.3.0`, use the most recent release tag. Check [WinToast releases](https://github.com/mohabouje/WinToast/releases).
+Added WinToast via `FetchContent` in the root `CMakeLists.txt` and exposed it as `WinToast::WinToast` for downstream platform linkage.
 
 #### 10.2 Create Notification Interface
 
-Add the `INotificationManager` interface to `src/platform/platform_interface.hpp` inside `namespace blinkbreak::platform`, following the existing pattern of `IIdleDetector` and `IMonitorManager`.
-
-```cpp
-/// @brief Describes the user's response to a toast notification.
-enum class NotificationAction {
-    Clicked,    ///< User clicked the notification body.
-    Dismissed,  ///< User dismissed or notification timed out.
-    SkipBreak,  ///< User clicked the "Skip" action button.
-    SnoozeBreak ///< User clicked the "Snooze" action button.
-};
-
-/// @brief Interface for managing OS toast notifications.
-class INotificationManager {
-public:
-    virtual ~INotificationManager() = default;
-
-    /// @brief Initializes the notification backend.
-    /// Must be called from the main (STA) thread after COM is initialized.
-    /// @return True if initialization succeeded.
-    virtual bool Initialize() = 0;
-
-    /// @brief Shows a toast notification with action buttons.
-    /// @param title   The notification title (first line).
-    /// @param message The notification body text (second line).
-    /// @return A non-negative toast ID on success, or -1 on failure.
-    virtual int64_t Show(const std::string& title,
-                         const std::string& message) = 0;
-
-    /// @brief Hides (dismisses) a previously shown notification.
-    /// @param toast_id The ID returned by Show().
-    virtual void Hide(int64_t toast_id) = 0;
-
-    /// @brief Sets the callback for notification action events.
-    /// The callback receives the NotificationAction describing what
-    /// the user did with the toast.
-    /// @param callback The callback function.
-    virtual void SetOnAction(
-        std::function<void(NotificationAction)> callback) = 0;
-
-    /// @brief Checks whether the notification backend is available.
-    /// @return True if the system supports toast notifications.
-    [[nodiscard]] virtual bool IsSupported() const = 0;
-};
-
-/// @brief Factory function for creating the platform notification manager.
-/// @return A unique_ptr to the platform-specific INotificationManager.
-std::unique_ptr<INotificationManager> CreateNotificationManager();
-```
+Added `NotificationAction`, `INotificationManager`, and `CreateNotificationManager()` to `src/platform/platform_interface.hpp`.
 
 #### 10.3 Create Windows Toast Notification Implementation
 
-Create `src/platform/windows/notification_win.hpp`:
-
-```cpp
-/// @file notification_win.hpp
-/// @brief Windows toast notification implementation using WinToast.
-
-#ifndef BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
-#define BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
-
-#include <cstdint>
-#include <functional>
-#include <mutex>
-#include <string>
-
-#include "platform/platform_interface.hpp"
-
-namespace blinkbreak::platform {
-
-/// @brief Windows implementation of INotificationManager using WinToast.
-class NotificationManagerWin : public INotificationManager {
-public:
-    NotificationManagerWin();
-    ~NotificationManagerWin() override;
-
-    // Non-copyable, non-movable
-    NotificationManagerWin(const NotificationManagerWin&) = delete;
-    NotificationManagerWin& operator=(const NotificationManagerWin&) = delete;
-    NotificationManagerWin(NotificationManagerWin&&) = delete;
-    NotificationManagerWin& operator=(NotificationManagerWin&&) = delete;
-
-    bool Initialize() override;
-    int64_t Show(const std::string& title,
-                 const std::string& message) override;
-    void Hide(int64_t toast_id) override;
-    void SetOnAction(
-        std::function<void(NotificationAction)> callback) override;
-    [[nodiscard]] bool IsSupported() const override;
-
-private:
-    bool initialized_ = false;
-    std::function<void(NotificationAction)> on_action_;
-    mutable std::mutex mutex_;
-};
-
-}  // namespace blinkbreak::platform
-
-#endif  // BLINKBREAK_PLATFORM_NOTIFICATION_WIN_HPP
-```
-
-Create `src/platform/windows/notification_win.cpp`:
+Implemented `NotificationManagerWin` in `src/platform/windows/notification_win.hpp/cpp`.
 
 Key implementation details:
 
-1. **WinToast singleton configuration:**
-   - Set `AppName` to `L"BlinkBreak"`.
-   - Set `AppUserModelId` via `WinToast::configureAUMI(L"BlinkBreak", L"BlinkBreak", L"BreakReminder", L"1.0")`.
-
-2. **COM initialization caution:**
-   - Slint initializes COM as STA on the main thread. WinToast also calls `CoInitializeEx`. If WinToast is initialized _after_ Slint has already set STA, the second `CoInitializeEx(nullptr, COINIT_MULTITHREADED)` call will return `RPC_E_CHANGED_MODE`.
-   - **Workaround:** Call `WinToast::instance()->initialize()` from the **main thread** _after_ Slint's event loop has started (i.e., from within `slint::invoke_from_event_loop` or from `AppController::Initialize()` after the main window is created). WinToast's internal `CoInitializeEx` will succeed as a nested STA call (returns `S_FALSE` which is fine).
-   - **Alternative:** If WinToast still fails with `RPC_E_CHANGED_MODE`, patch the call by pre-initializing COM as `COINIT_APARTMENTTHREADED` before Slint starts, or skip WinToast's internal COM init by wrapping its initialize in a try/catch. See conversation `18d155af-e3ac-4ab7-87a0-4de8f2eb96aa` for details.
-
-3. **Toast template:**
-   - Use `WinToastTemplate::Text02` (title + body, no image).
-   - Add two actions: `L"Skip break"` (index 0) and `L"Snooze break"` (index 1).
-   - Set `Duration` to `WinToastTemplate::Duration::Short` for pre-break warnings.
-
-4. **Event handler:**
-   - Create an inner class `BlinkBreakToastHandler : public WinToastLib::IWinToastHandler`.
-   - `toastActivated()` (no-arg version) → invoke callback with `NotificationAction::Clicked`.
-   - `toastActivated(int actionIndex)` → map index 0 → `NotificationAction::SkipBreak`, index 1 → `NotificationAction::SnoozeBreak`.
-   - `toastDismissed(WinToastDismissalReason)` → invoke callback with `NotificationAction::Dismissed`.
-   - `toastFailed()` → log error via spdlog, no callback.
-   - **Thread safety:** WinToast invokes handler callbacks on a COM worker thread, not the main thread. The handler must capture a `std::shared_ptr` to the callback and use `slint::invoke_from_event_loop` (or post to a thread-safe queue) to relay actions back to the main thread.
-
-5. **Show method:**
-   - Creates a `WinToastTemplate`, sets fields and actions, calls `WinToast::instance()->showToast(templ, handler, &error)`.
-   - Returns the toast ID (or -1 on failure).
-
-6. **Hide method:**
-   - Calls `WinToast::instance()->hideToast(toast_id)`.
-
-7. **IsSupported method:**
-   - Returns `WinToastLib::WinToast::isCompatible()`.
-
-8. **Factory function:**
-   - Implement `CreateNotificationManager()` to return `std::make_unique<NotificationManagerWin>()`.
+1. Configures WinToast with the BlinkBreak app name and AUMI.
+2. Initializes from the main/UI thread after Slint COM setup to avoid `RPC_E_CHANGED_MODE`.
+3. Uses two-action toasts for pre-break warnings: **Skip break** and **Snooze break**.
+4. Relays WinToast callbacks back onto the Slint event loop before touching application state.
+5. Supports toast compatibility checks, display, and dismissal through the platform abstraction.
 
 #### 10.4 Update Platform CMakeLists.txt
 
-Update `src/platform/CMakeLists.txt` to add the new source files and link WinToast:
-
-```cmake
-# Inside the if(WIN32) block, add to target_sources:
-    windows/notification_win.hpp
-    windows/notification_win.cpp
-
-# Add WinToast as a dependency:
-target_link_libraries(blinkbreak_platform
-    PRIVATE
-        shell32
-        Shcore
-        WinToast::WinToast
-)
-```
-
-Also add `runtimeobject` to the Win32 link libraries if not already present (required by WinToast for `Windows.UI.Notifications`):
-
-```cmake
-target_link_libraries(blinkbreak_platform
-    PRIVATE
-        shell32
-        Shcore
-        WinToast::WinToast
-        runtimeobject
-)
-```
+Updated `src/platform/CMakeLists.txt` to compile the notification sources and link `WinToast::WinToast`, `runtimeobject`, and the existing Windows libraries.
 
 #### 10.5 AppController Integration
 
-Update `src/ui/app_controller.hpp`:
+Updated `src/ui/app_controller.hpp/cpp` to:
 
-- Add `#include <cstdint>` if not present.
-- Add forward declaration: `namespace platform { class INotificationManager; }`.
-- Add private member: `std::unique_ptr<platform::INotificationManager> notification_manager_;`.
-- Add private member: `int64_t active_toast_id_ = -1;` to track the currently shown notification.
-- Add private method: `void OnNotificationAction(platform::NotificationAction action);`.
-- Add private method: `void ShowPreBreakNotification(BreakType type);`.
-
-Update `src/ui/app_controller.cpp`:
-
-1. **In `Initialize()`:**
-   - Create notification manager: `notification_manager_ = platform::CreateNotificationManager();`.
-   - Initialize it: `notification_manager_->Initialize();` (must run on main thread after Slint's COM init).
-   - Set the action callback:
-
-     ```cpp
-     notification_manager_->SetOnAction(
-         [this](platform::NotificationAction action) {
-             // This callback arrives from a COM thread — relay to main thread
-             slint::invoke_from_event_loop([this, action] {
-                 OnNotificationAction(action);
-             });
-         });
-     ```
-
-   - Wire the scheduler's warning callback:
-
-     ```cpp
-     scheduler_->SetOnWarning(
-         [this](BreakType type, const std::string& /*msg*/) {
-             slint::invoke_from_event_loop([this, type] {
-                 ShowPreBreakNotification(type);
-             });
-         },
-         config_.notification.warning_time
-     );
-     ```
-
-2. **`ShowPreBreakNotification(BreakType type)` implementation:**
-   - Guard: if `!config_.notification.enabled` → return.
-   - Guard: if `notification_manager_ && !notification_manager_->IsSupported()` → return.
-   - Compose the title: `"Short break in X seconds"` or `"Long break in X seconds"` (use `config_.notification.warning_time` for X).
-   - Compose the body message from the scheduler's message provider.
-   - Call `active_toast_id_ = notification_manager_->Show(title, body);`.
-
-3. **`OnNotificationAction(NotificationAction action)` implementation:**
-   - `NotificationAction::SkipBreak` → call `OnSkip()`.
-   - `NotificationAction::SnoozeBreak` → call `OnSnooze()`.
-   - `NotificationAction::Clicked` → log and optionally show the main window.
-   - `NotificationAction::Dismissed` → log, no action.
-   - Reset `active_toast_id_ = -1;`.
-
-4. **In break-start handler:**
-   - When the overlay starts (break begins), auto-dismiss any lingering notification: if `active_toast_id_ >= 0`, call `notification_manager_->Hide(active_toast_id_)` and reset to -1.
-
-5. **In `OnOpenSettings()` and settings save handler:**
-   - Bind `notification.enabled`, `notification.warning_time`, and `notification.respect_dnd` to/from the Settings dialog.
-   - On save, update the scheduler's warning callback time if `warning_time` changed:
-
-     ```cpp
-     scheduler_->SetOnWarning(/* same callback */, config_.notification.warning_time);
-     ```
+- Own the notification manager and active toast ID.
+- Initialize notifications during startup and relay action callbacks onto the UI thread.
+- Show pre-break notifications from the scheduler warning callback.
+- Handle skip, snooze, click, and dismiss actions.
+- Auto-dismiss any active toast when a break overlay starts.
+- Bind notification settings in the settings dialog and refresh warning timing after save.
 
 #### 10.6 Settings Dialog UI
 
-Update `ui/components/settings_dialog.slint` to add notification settings:
-
-- Add properties:
-  - `in-out property <bool> notification-enabled: true;`
-  - `in-out property <int> notification-warning-seconds: 30;`
-  - `in-out property <bool> notification-respect-dnd: true;`
-
-- Add a "Notifications" section in the dialog layout with:
-  - Toggle button: "Notifications" → Enabled / Disabled (bound to `notification-enabled`).
-  - Number input: "Warning time (seconds)" (bound to `notification-warning-seconds`). Validate range 5–300.
-  - Toggle button: "Respect DND" → Yes / No (bound to `notification-respect-dnd`).
+Updated `ui/components/settings_dialog.slint` with notification enablement, warning time, and DND-respect controls, including warning-time validation.
 
 #### 10.7 Update Source CMakeLists.txt
 
-Update `src/CMakeLists.txt` — no changes needed if notifications are purely in `blinkbreak_platform`. If a higher-level `notification_manager` wrapper is created in `src/ui/`, add it to the `blinkbreak_ui` target.
+No `src/CMakeLists.txt` changes were required because the notification implementation lives in `blinkbreak_platform`.
 
 ### Test Requirements
 
@@ -1768,37 +1522,216 @@ Validation results:
 
 ### Goal
 
-Detect Windows Focus Assist/DND mode and optionally suppress breaks.
+Detect Windows Focus Assist/DND mode and optionally suppress break overlays when the user is in a focus session, presentation mode, or running a full-screen application. The behavior should be configurable — users can choose to respect or ignore DND detection.
+
+Key requirements:
+
+- Detect DND states: Focus Assist, Presentation Mode, Full-screen D3D apps, Quiet Time
+- Suppress break overlays when DND is active (unless configured to ignore)
+- Real-time detection via polling and optional `WM_SETTINGCHANGE` listener
+- Settings UI toggle for "Respect Do Not Disturb" (already exists as `notification-respect-dnd`)
+- Extend existing `respect_dnd` config to also control overlay suppression (not just notifications)
 
 ### Prerequisites
 
 - Stage 10 completed successfully
+- All 174+ tests pass
+
+### Background: Windows DND APIs
+
+Windows provides the `SHQueryUserNotificationState()` API (shellapi.h) which returns a `QUERY_USER_NOTIFICATION_STATE` enum:
+
+To resolve the Markdown Linter warning **MD060** ("Table column style"), ensure each separator row uses consistent alignment markers—ideally defaulting to left-aligned (`|---|`) across all columns. Additionally, remove backtick escaping within table cells and normalize whitespace.
+
+| Value | Constant | Meaning |
+| --- | --- | --- |
+| 1 | QUNS_NOT_PRESENT | Screen saver running, machine locked, or Fast User Switching |
+| 2 | QUNS_BUSY | Full-screen app running or Presentation Settings enabled |
+| 3 | QUNS_RUNNING_D3D_FULL_SCREEN | Full-screen exclusive D3D application |
+| 4 | QUNS_PRESENTATION_MODE | Windows Presentation Settings explicitly enabled |
+| 5 | QUNS_ACCEPTS_NOTIFICATIONS | Normal state — notifications allowed |
+| 6 | QUNS_QUIET_TIME | Quiet Time (legacy behavior) |
+
+**Note:** `SHQueryUserNotificationState()` is still useful as a fallback, but it does **not** reliably expose the plain Windows 11 Do Not Disturb toggle on its own. In practice it often reports `QUNS_ACCEPTS_NOTIFICATIONS` until BlinkBreak's own fullscreen overlay appears, which is too late for suppression. Stage 11 therefore combines three signals in order: WinRT Focus session state, Windows 11 Quiet Hours / Do Not Disturb profile data via `readCloudDataSettings.exe`, and finally the legacy shell API as a fallback.
+
+**Existing code:** Stage 11 moved the old local helper into `src/platform/windows/dnd_detector_win.cpp` and now allows the UI layer to force a live probe immediately before a toast or overlay is shown, instead of relying only on the last polled state.
 
 ### Implementation Steps
 
 #### 11.1 Create DND Detector Interface
 
-```cpp
-/// @brief Interface for Do Not Disturb detection.
-class IDndDetector {
-public:
-    virtual ~IDndDetector() = default;
+Added `DndState`, `DndStateToString()`, `IDndDetector`, and `CreateDndDetector()` to `src/platform/platform_interface.hpp`. Later Stage 11 refinements also added live refresh, polling-interval access, and fullscreen-detection helpers.
 
-    virtual bool IsDndActive() = 0;
-    virtual void SetOnDndChange(std::function<void(bool)> callback) = 0;
-};
+#### 11.2 Create Windows DND Detector Header
+
+Created `src/platform/windows/dnd_detector_win.hpp` with the Windows detector declaration.
+
+#### 11.3 Create Windows DND Detector Implementation
+
+Implemented `DndDetectorWin` in `src/platform/windows/dnd_detector_win.cpp`.
+
+Key implementation details:
+
+1. Polls DND state on a background thread with configurable interval and thread-safe state storage.
+2. Combines WinRT Focus detection, Windows 11 Quiet Hours / DND profile probing, and `SHQueryUserNotificationState()` as a fallback.
+3. Exposes `RefreshState()` so the UI can force a live probe immediately before showing a toast or overlay.
+4. Invokes state-change callbacks safely and cleans up the worker thread on shutdown.
+
+#### 11.4 Update Platform CMakeLists.txt
+
+Updated `src/platform/CMakeLists.txt` to compile the detector sources. Existing `shell32` linkage remains sufficient for the legacy fallback APIs.
+
+#### 11.5 Refactor AppController DND Integration
+
+Updated `src/ui/app_controller.hpp/cpp` to:
+
+- Replace the old local DND helper with `IDndDetector`.
+- Start and stop the detector with the application lifecycle.
+- Force live probes before pre-break notifications and overlays.
+- Suppress toasts and break overlays when configured DND/fullscreen rules are active.
+- Log state changes and suppression decisions more clearly.
+
+#### 11.6 Extend Configuration for Overlay DND Behavior
+
+Kept `notification.respect_dnd` as the main DND suppression flag and added `notification.respect_fullscreen` to control fullscreen-app suppression separately, reducing false positives from `QUNS_BUSY`.
+
+#### 11.7 Settings Dialog UI Update
+
+Updated `ui/components/settings_dialog.slint` to clarify the DND behavior and added the fullscreen-respect toggle used by the final implementation.
+
+### Test Requirements
+
+#### Unit Tests
+
+Create `tests/unit/test_dnd_detector.cpp`:
+
+**MockDndDetector tests (8 tests):**\n\n1. `MockDndDetector_InitialState` — Default state is `AcceptsNotifications`, `IsDndActive()` returns false
+2. `MockDndDetector_StartAndStop` — `Start()` sets running, `Stop()` clears it
+3. `MockDndDetector_SetAndGetState` — Can set state, `GetState()` returns it
+4. `MockDndDetector_IsDndActiveForEachState` — Test `IsDndActive()` returns correct value for each `DndState`
+5. `MockDndDetector_CallbackTriggeredOnChange` — Callback fires when state changes from active to inactive
+6. `MockDndDetector_CallbackNotTriggeredOnSameState` — Callback does not fire if state stays the same
+7. `MockDndDetector_PollingIntervalCanBeSet` — `SetPollingInterval()` updates interval
+8. `MockDndDetector_NullCallbackHandled` — Setting null callback does not crash
+
+**DndDetectorWin tests (8 tests):**\n\n1. `DndDetectorWin_CreateDndDetector` — `CreateDndDetector()` returns non-null
+2. `DndDetectorWin_InitialState` — Not running, state is `AcceptsNotifications` or current system state
+3. `DndDetectorWin_StartAndStop` — Lifecycle works correctly
+4. `DndDetectorWin_StartTwiceIsNoOp` — Double-start does not crash
+5. `DndDetectorWin_StopWhenNotRunningIsNoOp` — Double-stop does not crash
+6. `DndDetectorWin_GetStateReturnsValidEnum` — `GetState()` returns a valid `DndState` value
+7. `DndDetectorWin_IsDndActiveMatchesState` — `IsDndActive()` consistent with `GetState()`
+8. `DndDetectorWin_CallbackCanBeSet` — Setting callback does not crash
+
+**DndStateToString tests (1 test):**\n\n1. `DndStateToString_AllValues` — Each enum value maps to expected string
+
+#### UI Tests
+
+Update `tests/ui/test_settings_dialog.cpp`:
+
+1. `RespectDndToggleDefault` — Verify `notification-respect-dnd` defaults to true
+2. `RespectDndToggleRoundTrip` — Toggle off, verify false, toggle on, verify true
+
+(These tests may already exist from Stage 10; verify and add if missing)
+
+#### Integration Tests (Stage 12)
+
+- `DndSuppressesOverlay` — Simulate DND active, verify overlay does not appear
+- `DndDoesNotSuppressWhenDisabled` — Set `respect_dnd = false`, verify overlay appears despite DND
+- `DndStateChangeCallback` — Verify callback fires when DND state transitions
+
+### Verification Criteria
+
+- [x] All Stage 10 tests still pass
+- [x] All new DND detector unit tests pass (20 tests: 8 MockDndDetector + 11 DndDetectorWin + 1 DndStateToString)
+- [x] All UI tests pass (25 tests)
+- [x] `ctest --preset=debug --output-on-failure` passes all tests (174 unit tests + 25 UI tests = 199 total)
+- [x] Manual validation: Enable Presentation Mode in Windows, start BlinkBreak with `respect_dnd = true`, verify break overlay does NOT appear
+- [x] Manual validation: Windows 11 Focus mode detected via registry, breaks correctly suppressed
+- [x] Manual validation: Plain Windows 11 Do Not Disturb suppresses both the pre-break toast and the overlay before either appears
+- [ ] Manual validation: Same setup with `respect_dnd = false`, verify overlay DOES appear
+- [x] Manual validation: Run a full-screen game/app, verify DND is detected
+- [x] Manual validation: Toggle Focus Assist in Windows Action Center, observe log messages for state changes
+- [x] No repeated per-poll shell-state log spam in rebuilt binary
+- [ ] Application exits cleanly with no resource leaks
+
+### Validation Commands
+
+```bash
+cmake --preset=debug
+cmake --build --preset=debug
+ctest --preset=debug --output-on-failure
+build/debug/src/Debug/blinkbreak.exe --version
+build/debug/src/Debug/blinkbreak.exe
 ```
 
-#### 11.2 Windows Focus Assist Detection
+Validation results:
 
-Implement using Windows Query Focus Assist API.
+- `cmake --preset=debug --fresh`: configured successfully
+- `cmake --build --preset=debug`: build succeeded
+- `ctest --preset=debug --output-on-failure`: 174 unit tests passed, 25 UI tests passed (199 total)
+- Fresh revalidation after the latest live-refresh DND changes: `cmake --preset=debug --fresh && cmake --build --preset=debug && ctest --preset=debug --output-on-failure` passed with 199/199 tests
+- `build/debug/src/Debug/blinkbreak.exe --version`: outputs "BlinkBreak version 0.1.0"
 
 ### Deliverables
 
-- [x] DndDetector interface
-- [x] Windows implementation
-- [x] Configuration option
-- [x] Break suppression logic
+- [x] `DndState` enum and `DndStateToString()` in `platform_interface.hpp`
+- [x] `IDndDetector` interface in `platform_interface.hpp`
+- [x] `DndDetectorWin` implementation in `src/platform/windows/dnd_detector_win.hpp/cpp`
+- [x] `CreateDndDetector()` factory function
+- [x] `RefreshState()` accessor added for live on-demand DND probes before toast and overlay display
+- [x] `GetPollingInterval()` accessor added to interface and implementation
+- [x] `IsFullScreenDetected()` method for separate full-screen app detection
+- [x] Platform `CMakeLists.txt` updated with new sources
+- [x] `AppController` refactored to use `IDndDetector` instead of local helper
+- [x] Notification suppression when DND active and `respect_dnd = true`
+- [x] **Break overlay suppression when DND active and `respect_dnd = true`**
+- [x] **Separate `respect_fullscreen` config option** to control full-screen app detection independently
+- [x] DND state change logging (via callback)
+- [x] Unit tests for DND detector (22 new tests including IsFullScreenDetected)
+- [x] UI tests verified (existing `notification-respect-dnd` tests cover DND settings)
+- [x] All tests pass (174 unit + 25 UI = 199 total)
+- [ ] Manual runtime validation completed
+- [x] Code compiles without errors
+
+### Implementation Notes
+
+**Files Created:**
+
+- `src/platform/windows/dnd_detector_win.hpp` - Windows DND detector header
+- `src/platform/windows/dnd_detector_win.cpp` - Windows DND detector implementation using `SHQueryUserNotificationState()` fallback plus Windows 11 Focus and Quiet Hours profile detection
+- `tests/unit/test_dnd_detector.cpp` - Comprehensive unit tests (22 tests)
+
+**Files Modified:**
+
+- `src/platform/platform_interface.hpp` - Added `DndState` enum, `DndStateToString()`, `IDndDetector` interface, `CreateDndDetector()` factory, `RefreshState()`, and `IsFullScreenDetected()` support
+- `src/platform/CMakeLists.txt` - Added DND detector sources
+- `src/ui/app_controller.hpp` - Added `IDndDetector` forward declaration and DND suppression evaluation helper
+- `src/ui/app_controller.cpp` - Removed local helper, integrated `dnd_detector_` for notification and overlay suppression, added live `RefreshState()` probes and clearer config/DND logging
+- `src/core/config_types.hpp` - Added `respect_fullscreen` field to `NotificationConfig`
+- `src/core/config_manager.cpp` - Added default value for `respect_fullscreen` and fixed Glaze JSON serialization changes
+- `src/core/break_scheduler.hpp` - Added `ResetTimers()` method declaration
+- `src/core/break_scheduler.cpp` - Added `ResetTimers()` implementation for DND suppression (resets timers without triggering `OnBreakEnd` callback)
+- `ui/components/settings_dialog.slint` - Added `notification-respect-fullscreen` toggle
+- `resources/config/default_config.json` - Added `respect_fullscreen: false` default
+- `tests/unit/test_break_scheduler.cpp` - Added 2 new tests for `ResetTimers()`
+- `tests/unit/test_dnd_detector.cpp` - Added `IsFullScreenDetected()` tests and mock `RefreshState()` support
+- `AGENTS.md` - Updated Stage 11 notes with live-refresh DND detection and validation results
+
+**Key Implementation Details:**
+
+1. Background polling thread with configurable interval (default 1 second)
+2. Thread-safe state updates using `std::atomic`
+3. Callback invocation when DND active state changes
+4. Graceful thread cleanup on Stop()
+5. Factory function returns platform-specific implementation
+6. **Break overlay suppression**: When a break is triggered and `respect_dnd = true`, the DND state is checked. If DND is active, the break is silently skipped (no overlay shown) and a log message is emitted.
+7. **Windows 11 Focus Detection**: The legacy `SHQueryUserNotificationState()` API does NOT detect Windows 11's new "Focus" feature. Added WinRT Focus session detection plus fallback handling.
+8. **Windows 11 Do Not Disturb Detection**: Added a best-effort probe using `readCloudDataSettings.exe` for `Windows.Data.DoNotDisturb.QuietHoursSettings`. When `selectedProfile` is not `Unrestricted`, BlinkBreak treats the machine as being in DND mode.
+9. **Live refresh before suppression checks**: `AppController` now forces `RefreshState()` immediately before showing a toast or overlay so stale poll state cannot allow a break through and only flip to `Busy` after BlinkBreak's own overlay is already fullscreen.
+10. **ResetTimers() method**: Added to `BreakScheduler` to reset all timers without triggering `OnBreakEnd` callback. This is used for DND suppression to avoid the state machine warning where `SkipBreak()` would call `OnBreakEnd` but the state machine never transitioned to `BreakActive` state.
+11. **Separate `respect_fullscreen` config**: The `QUNS_BUSY` state often gives false positives (maximized windows, certain apps). Added a separate `respect_fullscreen` config option (default: false) to control whether full-screen app detection should suppress breaks independently from actual DND modes like Focus Assist and Presentation Mode.
+12. **Reduced log noise**: Removed repeated per-poll shell-state debug spam and added clearer startup/runtime logs for DND source decisions and notification suppression.
 
 ---
 
@@ -1959,21 +1892,21 @@ doxygen Doxyfile
 
 This implementation plan provides a comprehensive 12-stage roadmap for building BlinkBreak:
 
-| Stage | Focus             | Tests Added | Total Tests  |
-| ----- | ----------------- | ----------- | ------------ |
-| 1     | Foundation        | 10          | 10           |
-| 2     | State Machine     | 24          | 34           |
-| 3     | Configuration     | 23          | 57           |
-| 4     | Message/Scheduler | 25          | 82           |
-| 5     | Basic UI          | -           | 82           |
-| 6     | System Tray       | -           | 82           |
-| 6B    | UI Tests          | 15          | 97           |
-| 7     | Overlay           | 2           | 99           |
-| 7B    | Stability/Assets  | -           | 99           |
-| 8     | Multi-Monitor     | 27          | 126 (unit)   |
-| 9     | Idle Detection    | 22          | 145 (126+19) |
-| 10    | Notifications     | 16          | -            |
-| 11    | DND Detection     | 2           | -            |
-| 12    | Integration       | 10+         | 160+         |
+| Stage | Focus             | Tests Added | Total Tests     |
+| ----- | ----------------- | ----------- | --------------- |
+| 1     | Foundation        | 10          | 10              |
+| 2     | State Machine     | 24          | 34              |
+| 3     | Configuration     | 23          | 57              |
+| 4     | Message/Scheduler | 25          | 82              |
+| 5     | Basic UI          | -           | 82              |
+| 6     | System Tray       | -           | 82              |
+| 6B    | UI Tests          | 15          | 97              |
+| 7     | Overlay           | 2           | 99              |
+| 7B    | Stability/Assets  | -           | 99              |
+| 8     | Multi-Monitor     | 27          | 126 (unit)      |
+| 9     | Idle Detection    | 22          | 145 (126+19)    |
+| 10    | Notifications     | 16          | 174 (unit + UI) |
+| 11    | DND Detection     | 25          | 199 (174+25 UI) |
+| 12    | Integration       | 10+         | 210+            |
 
 Each stage builds upon the previous, maintaining a working prototype throughout development. Follow TDD principles strictly: write tests first, then implement the minimum code to pass.

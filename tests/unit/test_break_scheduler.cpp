@@ -497,5 +497,53 @@ TEST_F(BreakSchedulerTest, UpdateConfigAppliesNewBreakDurationWithoutResettingTi
     EXPECT_EQ(received_info.duration, 10s);
 }
 
+TEST_F(BreakSchedulerTest, ResetTimersResetsWithoutTriggeringCallback) {
+    // Start the scheduler and let it run
+    scheduler_->Start();
+    scheduler_->Update(5s);  // Progress the timer
+
+    // Set up a callback that should NOT be called
+    bool callback_called = false;
+    scheduler_->SetOnBreakEnd([&callback_called](const BreakInfo&) { callback_called = true; });
+
+    // Trigger a break first so we can test ResetTimers during a break
+    scheduler_->Update(5s);  // Expire the short timer to trigger a break
+    EXPECT_TRUE(scheduler_->IsBreakActive());
+
+    // Reset timers - should NOT call OnBreakEnd
+    scheduler_->ResetTimers();
+
+    // Verify the callback was NOT called (key difference from SkipBreak)
+    EXPECT_FALSE(callback_called);
+
+    // Verify break is no longer active
+    EXPECT_FALSE(scheduler_->IsBreakActive());
+
+    // Verify scheduler is still running
+    EXPECT_TRUE(scheduler_->IsRunning());
+
+    // Verify timers were reset to initial values
+    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+    ASSERT_TRUE(short_remaining.has_value());
+    EXPECT_EQ(*short_remaining, short_config_.interval);
+}
+
+TEST_F(BreakSchedulerTest, ResetTimersWorksWhenNotInBreak) {
+    // Start and progress, but don't trigger a break
+    scheduler_->Start();
+    scheduler_->Update(5s);  // 5s in, still not at break time
+
+    // Reset timers
+    scheduler_->ResetTimers();
+
+    // Verify scheduler is still running
+    EXPECT_TRUE(scheduler_->IsRunning());
+
+    // Verify timers were reset to initial values
+    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+    ASSERT_TRUE(short_remaining.has_value());
+    EXPECT_EQ(*short_remaining, short_config_.interval);
+}
+
 }  // namespace
 }  // namespace blinkbreak

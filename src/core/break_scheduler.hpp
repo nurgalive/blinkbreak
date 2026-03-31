@@ -80,6 +80,10 @@ public:
     /// @brief Skips the current or next break.
     void SkipBreak();
 
+    /// @brief Resets all timers without triggering OnBreakEnd callback.
+    /// Used for DND suppression when a break should be silently skipped.
+    void ResetTimers();
+
     /// @brief Snoozes the current break.
     /// @param duration Optional custom snooze duration.
     void SnoozeBreak(std::optional<Duration> duration = std::nullopt);

@@ -38,6 +38,7 @@ namespace platform {
 class IMonitorManager;
 class IIdleDetector;
 class INotificationManager;
+class IDndDetector;
 enum class NotificationAction;
 }  // namespace platform
 
@@ -162,6 +163,13 @@ private:
     /// @brief Applies the configured theme to the settings dialog.
     void ApplyThemeToSettingsDialog();
 
+    /// @brief Resolves the current live DND state and suppression policy.
+    /// @param respect_dnd Whether actual DND/Focus states should be respected.
+    /// @param respect_fullscreen Whether fullscreen/presentation states should be respected.
+    /// @return Latest DND state plus whether BlinkBreak should suppress UI.
+    [[nodiscard]] std::pair<platform::DndState, bool> EvaluateDndSuppression(
+        bool respect_dnd, bool respect_fullscreen);
+
     /// @brief Formats duration as MM:SS string.
     /// @param duration The duration to format.
     /// @return Formatted string.
@@ -175,6 +183,7 @@ private:
     std::shared_ptr<platform::IMonitorManager> monitor_manager_;
     std::unique_ptr<platform::IIdleDetector> idle_detector_;
     std::unique_ptr<platform::INotificationManager> notification_manager_;
+    std::unique_ptr<platform::IDndDetector> dnd_detector_;
     AppConfig config_;
     std::filesystem::path config_path_;
 

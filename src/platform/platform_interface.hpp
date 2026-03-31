@@ -187,10 +187,10 @@ std::unique_ptr<IIdleDetector> CreateIdleDetector();
 
 /// @brief Describes the user's response to a toast notification.
 enum class NotificationAction {
-    Clicked,    ///< User clicked the notification body.
-    Dismissed,  ///< User dismissed or notification timed out.
-    SkipBreak,  ///< User clicked the "Skip break" action button.
-    SnoozeBreak ///< User clicked the "Snooze break" action button.
+    Clicked,     ///< User clicked the notification body.
+    Dismissed,   ///< User dismissed or notification timed out.
+    SkipBreak,   ///< User clicked the "Skip break" action button.
+    SnoozeBreak  ///< User clicked the "Snooze break" action button.
 };
 
 /// @brief Interface for managing OS toast notifications.
@@ -225,6 +225,111 @@ public:
 /// @brief Factory function for creating the platform notification manager.
 /// @return A unique_ptr to the platform-specific INotificationManager.
 std::unique_ptr<INotificationManager> CreateNotificationManager();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Do Not Disturb Detection
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @brief Describes the current Do Not Disturb state.
+///
+/// These values map to Windows QUERY_USER_NOTIFICATION_STATE values.
+enum class DndState {
+    NotPresent,            ///< Screen saver, locked, or Fast User Switching active.
+    Busy,                  ///< Full-screen app or Presentation Settings enabled.
+    FullScreenD3D,         ///< Full-screen exclusive D3D application running.
+    PresentationMode,      ///< Windows Presentation Settings explicitly enabled.
+    FocusActive,           ///< Windows 11 Focus session is currently active.
+    DoNotDisturbActive,    ///< Windows 11 Do Not Disturb is active.
+    AcceptsNotifications,  ///< Normal state — DND is OFF, notifications allowed.
+    QuietTime,             ///< Quiet Time period (first hour after login).
+    WindowsStoreApp        ///< Full-screen Windows Store app (Win8+).
+};
+
+/// @brief Converts DndState to a human-readable string.
+/// @param state The DND state.
+/// @return String representation (e.g., "Busy", "AcceptsNotifications").
+[[nodiscard]] constexpr const char* DndStateToString(DndState state) {
+    switch (state) {
+        case DndState::NotPresent:
+            return "NotPresent";
+        case DndState::Busy:
+            return "Busy";
+        case DndState::FullScreenD3D:
+            return "FullScreenD3D";
+        case DndState::PresentationMode:
+            return "PresentationMode";
+        case DndState::FocusActive:
+            return "FocusActive";
+        case DndState::DoNotDisturbActive:
+            return "DoNotDisturbActive";
+        case DndState::AcceptsNotifications:
+            return "AcceptsNotifications";
+        case DndState::QuietTime:
+            return "QuietTime";
+        case DndState::WindowsStoreApp:
+            return "WindowsStoreApp";
+    }
+    return "Unknown";
+}
+
+/// @brief Interface for Do Not Disturb detection.
+///
+/// Monitors the system's DND/Focus Assist state and provides callbacks when
+/// the state changes. This allows the application to suppress break overlays
+/// and notifications when the user is in a focus session, presentation mode,
+/// or running a full-screen application.
+class IDndDetector {
+public:
+    virtual ~IDndDetector() = default;
+
+    /// @brief Starts monitoring for DND state changes.
+    virtual void Start() = 0;
+
+    /// @brief Stops monitoring.
+    virtual void Stop() = 0;
+
+    /// @brief Checks if the detector is currently monitoring.
+    /// @return True if monitoring is active.
+    [[nodiscard]] virtual bool IsRunning() const = 0;
+
+    /// @brief Gets the current DND state.
+    /// @return The current DndState enum value.
+    [[nodiscard]] virtual DndState GetState() const = 0;
+
+    /// @brief Forces an immediate state refresh.
+    /// @return The latest DND state observed from the operating system.
+    [[nodiscard]] virtual DndState RefreshState() = 0;
+
+    /// @brief Checks if DND is currently active.
+    ///
+    /// DND is considered active for any state except AcceptsNotifications.
+    /// @return True if notifications/overlays should be suppressed.
+    [[nodiscard]] virtual bool IsDndActive() const = 0;
+
+    /// @brief Checks if the current state is due to full-screen app detection.
+    ///
+    /// This is separate from actual DND/Focus modes. Full-screen detection
+    /// (QUNS_BUSY) can trigger when maximized apps are running, which some
+    /// users may not want to treat as DND.
+    /// @return True if the state is Busy (full-screen app detected).
+    [[nodiscard]] virtual bool IsFullScreenDetected() const = 0;
+
+    /// @brief Sets the callback for DND state changes.
+    /// @param callback Function called with (is_dnd_active) when state changes.
+    virtual void SetOnDndChange(std::function<void(bool)> callback) = 0;
+
+    /// @brief Sets the polling interval for state checks.
+    /// @param interval Polling interval (default: 1 second).
+    virtual void SetPollingInterval(std::chrono::milliseconds interval) = 0;
+
+    /// @brief Gets the current polling interval.
+    /// @return The configured polling interval.
+    [[nodiscard]] virtual std::chrono::milliseconds GetPollingInterval() const = 0;
+};
+
+/// @brief Creates platform-specific DND detector implementation.
+/// @return Unique pointer to the DND detector implementation.
+std::unique_ptr<IDndDetector> CreateDndDetector();
 
 }  // namespace platform
 }  // namespace blinkbreak

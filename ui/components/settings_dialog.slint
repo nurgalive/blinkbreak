@@ -71,6 +71,7 @@ export component SettingsDialog inherits Window {
     in-out property <bool> notification-enabled: true;
     in-out property <string> notification-warning-seconds: "30";
     in-out property <bool> notification-respect-dnd: true;
+    in-out property <bool> notification-respect-fullscreen: false;
 
     // Idle detection settings
     in-out property <bool> idle-enabled: true;
@@ -279,6 +280,23 @@ export component SettingsDialog inherits Window {
 
                     Switch {
                         checked <=> root.notification-respect-dnd;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Respect full-screen apps";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.notification-respect-fullscreen;
                     }
                 }
 

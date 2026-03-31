@@ -14,7 +14,6 @@
 
 #ifdef _WIN32
     #include <windows.h>
-    #include <shellapi.h>
 #endif
 
 #include "main_window.h"
@@ -65,28 +64,6 @@ HWND FindWindowByTitle(const wchar_t* title) {
     }
     return hwnd;
 }
-
-bool IsDndActive() {
-    QUERY_USER_NOTIFICATION_STATE state = QUNS_ACCEPTS_NOTIFICATIONS;
-    const HRESULT result = SHQueryUserNotificationState(&state);
-    if (FAILED(result)) {
-        spdlog::debug("SHQueryUserNotificationState failed: 0x{:08x}",
-                      static_cast<unsigned int>(result));
-        return false;
-    }
-
-    switch (state) {
-        case QUNS_BUSY:
-        case QUNS_PRESENTATION_MODE:
-        case QUNS_RUNNING_D3D_FULL_SCREEN:
-        case QUNS_QUIET_TIME:
-            return true;
-        case QUNS_ACCEPTS_NOTIFICATIONS:
-        case QUNS_APP:
-        default:
-            return false;
-    }
-}
 #endif
 
 }  // namespace
@@ -121,6 +98,11 @@ AppController::~AppController() {
         idle_detector_->Stop();
     }
 
+    // Stop DND detector
+    if (dnd_detector_) {
+        dnd_detector_->Stop();
+    }
+
     if (timer_thread_.joinable()) {
         timer_thread_.join();
     }
@@ -142,6 +124,11 @@ bool AppController::Initialize() {
         config_ = ConfigManager::GetDefault();
         spdlog::info("Using default configuration");
     }
+
+    spdlog::info(
+        "Notification config: enabled={}, warning_time={}s, respect_dnd={}, respect_fullscreen={}",
+        config_.notification.enabled, config_.notification.warning_time.count(),
+        config_.notification.respect_dnd, config_.notification.respect_fullscreen);
 
     // Validate configuration
     auto errors = config_manager_->Validate(config_);
@@ -199,8 +186,50 @@ bool AppController::Initialize() {
         spdlog::info("Idle detection disabled");
     }
 
+    // Create DND detector for Focus Assist / Do Not Disturb monitoring
+    dnd_detector_ = platform::CreateDndDetector();
+    if (dnd_detector_) {
+        dnd_detector_->SetOnDndChange([this](bool is_dnd_active) {
+            spdlog::info("DND state changed: {}", is_dnd_active ? "active" : "inactive");
+        });
+        dnd_detector_->Start();
+        const auto initial_state = dnd_detector_->RefreshState();
+        spdlog::info(
+            "DND detection enabled (initial state: {}, respect_dnd={}, respect_fullscreen={})",
+            platform::DndStateToString(initial_state), config_.notification.respect_dnd,
+            config_.notification.respect_fullscreen);
+    }
+
     scheduler_->SetOnBreakStart([this](const BreakInfo& info) {
+        // Check DND suppression FIRST - before any state transitions
+        bool respect_dnd = false;
+        bool respect_fullscreen = false;
+        {
+            std::lock_guard lock(mutex_);
+            respect_dnd = config_.notification.respect_dnd;
+            respect_fullscreen = config_.notification.respect_fullscreen;
+        }
+
+        const auto [dnd_state, should_suppress] =
+            EvaluateDndSuppression(respect_dnd, respect_fullscreen);
+
+        if (should_suppress) {
+            spdlog::info(
+                "Break suppressed before overlay: state={}, respect_dnd={}, respect_fullscreen={}",
+                platform::DndStateToString(dnd_state), respect_dnd, respect_fullscreen);
+            // Silently skip - reset timers without showing overlay or changing state
+            // Use invoke_from_event_loop since OnBreakStart may be called from timer thread
+            slint::invoke_from_event_loop([this]() {
+                if (scheduler_) {
+                    // Directly reset timers without triggering OnBreakEnd callback
+                    scheduler_->ResetTimers();
+                }
+            });
+            return;
+        }
+
         spdlog::info("Break started: {}", BreakTypeToString(info.type));
+
         const auto current_state = GetCurrentStateSnapshot();
         if (current_state == State::kSnoozed) {
             state_machine_->ProcessEvent(SnoozeExpiredEvent{});
@@ -284,18 +313,16 @@ bool AppController::Initialize() {
         }
     });
 
-    const auto warning_time = config_.notification.enabled ? config_.notification.warning_time
-                                                            : Duration::zero();
+    const auto warning_time =
+        config_.notification.enabled ? config_.notification.warning_time : Duration::zero();
     scheduler_->SetOnWarning(
         [this](BreakType type, Duration time_until) {
-            spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
-                         time_until.count());
+            spdlog::info("Warning: {} break in {}s", BreakTypeToString(type), time_until.count());
             if (tray_manager_) {
                 tray_manager_->UpdateStatus(is_running_, time_until, type);
             }
-            slint::invoke_from_event_loop([this, type, time_until]() {
-                ShowPreBreakNotification(type, time_until);
-            });
+            slint::invoke_from_event_loop(
+                [this, type, time_until]() { ShowPreBreakNotification(type, time_until); });
         },
         warning_time);
 
@@ -369,11 +396,9 @@ bool AppController::Initialize() {
         } else {
             spdlog::warn("Toast notifications are not supported on this system");
         }
-        notification_manager_->SetOnAction(
-            [this](platform::NotificationAction action) {
-                slint::invoke_from_event_loop(
-                    [this, action]() { OnNotificationAction(action); });
-            });
+        notification_manager_->SetOnAction([this](platform::NotificationAction action) {
+            slint::invoke_from_event_loop([this, action]() { OnNotificationAction(action); });
+        });
     }
 
     // Initialize tray manager
@@ -647,8 +672,7 @@ void AppController::OnOpenSettings() {
             const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
             const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
             const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
-            const auto notification_warning_seconds =
-                ParsePositiveInt(notification_warning_text);
+            const auto notification_warning_seconds = ParsePositiveInt(notification_warning_text);
 
             if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
                 !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes ||
@@ -682,6 +706,7 @@ void AppController::OnOpenSettings() {
             updated.notification.enabled = dialog->get_notification_enabled();
             updated.notification.warning_time = Duration(*notification_warning_seconds);
             updated.notification.respect_dnd = dialog->get_notification_respect_dnd();
+            updated.notification.respect_fullscreen = dialog->get_notification_respect_fullscreen();
 
             // Update idle config
             updated.idle.enabled = dialog->get_idle_enabled();
@@ -708,6 +733,11 @@ void AppController::OnOpenSettings() {
                 std::lock_guard lock(mutex_);
                 config_ = updated;
             }
+            spdlog::info(
+                "Updated notification config: enabled={}, warning_time={}s, respect_dnd={}, "
+                "respect_fullscreen={}",
+                updated.notification.enabled, updated.notification.warning_time.count(),
+                updated.notification.respect_dnd, updated.notification.respect_fullscreen);
             if (!updated.notification.enabled && notification_manager_) {
                 int64_t toast_id = -1;
                 {
@@ -847,6 +877,7 @@ void AppController::OnOpenSettings() {
     dialog->set_notification_warning_seconds(slint::SharedString(
         std::to_string(static_cast<int>(snapshot.notification.warning_time.count()))));
     dialog->set_notification_respect_dnd(snapshot.notification.respect_dnd);
+    dialog->set_notification_respect_fullscreen(snapshot.notification.respect_fullscreen);
 
     // Bind idle settings
     dialog->set_idle_enabled(snapshot.idle.enabled);
@@ -1224,11 +1255,9 @@ void AppController::OnNotificationAction(platform::NotificationAction action) {
                 int width = rect.right - rect.left;
                 int height = rect.bottom - rect.top;
                 SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height, SWP_NOMOVE | SWP_NOZORDER);
-                slint::Timer::single_shot(std::chrono::milliseconds(50),
-                                          [hwnd, width, height]() {
-                                              SetWindowPos(hwnd, nullptr, 0, 0, width, height,
-                                                           SWP_NOMOVE | SWP_NOZORDER);
-                                          });
+                slint::Timer::single_shot(std::chrono::milliseconds(50), [hwnd, width, height]() {
+                    SetWindowPos(hwnd, nullptr, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
+                });
             }
         }
 #else
@@ -1290,15 +1319,14 @@ void AppController::ShowPreBreakNotification(BreakType type, Duration time_until
         return;
     }
 
-    if (notification_config.respect_dnd) {
-        bool dnd_active = false;
-#ifdef _WIN32
-        dnd_active = IsDndActive();
-#endif
-        if (dnd_active) {
-            spdlog::info("Notifications suppressed due to DND/Focus Assist");
-            return;
-        }
+    const auto [dnd_state, should_suppress] = EvaluateDndSuppression(
+        notification_config.respect_dnd, notification_config.respect_fullscreen);
+    if (should_suppress) {
+        spdlog::info(
+            "Notification suppressed before toast: state={}, respect_dnd={}, respect_fullscreen={}",
+            platform::DndStateToString(dnd_state), notification_config.respect_dnd,
+            notification_config.respect_fullscreen);
+        return;
     }
 
     std::string message;
@@ -1312,13 +1340,32 @@ void AppController::ShowPreBreakNotification(BreakType type, Duration time_until
         message = "Time to take a break";
     }
 
-    const std::string title = std::format("{} break in {} seconds",
-                                          BreakTypeToString(type), time_until.count());
+    const std::string title =
+        std::format("{} break in {} seconds", BreakTypeToString(type), time_until.count());
     const auto toast_id = notification_manager_->Show(title, message);
     {
         std::lock_guard lock(mutex_);
         active_toast_id_ = toast_id;
     }
+}
+
+std::pair<platform::DndState, bool> AppController::EvaluateDndSuppression(bool respect_dnd,
+                                                                          bool respect_fullscreen) {
+    if (!dnd_detector_) {
+        return {platform::DndState::AcceptsNotifications, false};
+    }
+
+    const auto state = dnd_detector_->RefreshState();
+    const bool is_active = state != platform::DndState::AcceptsNotifications;
+    const bool is_fullscreen = state == platform::DndState::Busy ||
+                               state == platform::DndState::FullScreenD3D ||
+                               state == platform::DndState::WindowsStoreApp;
+
+    if (!is_active) {
+        return {state, false};
+    }
+
+    return {state, is_fullscreen ? respect_fullscreen : respect_dnd};
 }
 
 void AppController::ApplyThemeToMainWindow() {

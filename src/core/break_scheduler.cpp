@@ -169,6 +169,36 @@ void BreakScheduler::SkipBreak() {
     }
 }
 
+void BreakScheduler::ResetTimers() {
+    // Reset break-related state without triggering OnBreakEnd callback
+    // Used for DND suppression when a break should be silently skipped
+    break_active_ = false;
+    break_timer_->Reset();
+    snooze_timer_->Reset();
+    warning_sent_ = false;
+
+    // Reset and restart short timer if enabled
+    if (short_config_.enabled) {
+        short_timer_->Reset();
+        short_interval_total_ = short_config_.interval;
+        if (is_running_) {
+            short_timer_->Start();
+        }
+    }
+
+    // Reset and restart long timer if enabled
+    if (long_config_.enabled) {
+        long_timer_->Reset();
+        long_interval_total_ = long_config_.interval;
+        if (is_running_) {
+            long_timer_->Start();
+        }
+    }
+
+    spdlog::info("Timers reset (DND suppression)");
+    // Note: We intentionally do NOT call on_break_end_ here
+}
+
 void BreakScheduler::SnoozeBreak(std::optional<Duration> duration) {
     if (!break_active_) {
         spdlog::debug("No break to snooze");

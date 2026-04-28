@@ -8,6 +8,9 @@
   - [Building](#building)
     - [Prerequisites](#prerequisites)
     - [Build Commands](#build-commands)
+      - [Ninja build and compile commands](#ninja-build-and-compile-commands)
+      - [Debug dev build](#debug-dev-build)
+      - [Configure and Build Release](#configure-and-build-release)
     - [UI Tests](#ui-tests)
     - [UI Test Hook Examples](#ui-test-hook-examples)
     - [Clangd support](#clangd-support)
@@ -106,6 +109,8 @@ A lightweight, cross-platform eye strain prevention application.
 
 Presets use the Visual Studio 17 2022 generator (multi-config).
 
+#### Ninja build and compile commands
+
 Run with ninja:
 
 ```bash
@@ -118,6 +123,8 @@ Generate compile commands:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\update_compile_commands.ps1
 ```
+
+#### Debug dev build
 
 ```bash
 # Configure (Debug)
@@ -146,8 +153,11 @@ ctest --preset=debug -R "^ui_"
 
 # Save test output to file
 ctest --preset=debug -V > test_output.txt
+```
 
-# Configure and build (Release)
+#### Configure and Build Release
+
+```bash
 cmake --preset=release --fresh
 cmake --build --preset=release
 ```

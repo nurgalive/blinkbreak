@@ -437,11 +437,6 @@ bool AppController::Initialize() {
                     OnStart();
                 }
             },
-        .on_skip =
-            [this]() {
-                spdlog::debug("Tray: Skip");
-                OnSkip();
-            },
         .on_settings =
             [this]() {
                 spdlog::debug("Tray: Settings");

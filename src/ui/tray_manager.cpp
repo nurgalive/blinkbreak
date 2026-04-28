@@ -77,10 +77,6 @@ void TrayManager::UpdateMenu(bool is_running) {
                      .callback = callbacks_.on_start_pause,
                      .enabled = true});
 
-    // Skip next break
-    items.push_back(
-        {.text = "Skip Next Break", .callback = callbacks_.on_skip, .enabled = is_running});
-
     items.push_back({.is_separator = true});
 
     // Settings

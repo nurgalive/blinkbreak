@@ -20,7 +20,6 @@ public:
     struct Callbacks {
         std::function<void()> on_show_window;
         std::function<void()> on_start_pause;
-        std::function<void()> on_skip;
         std::function<void()> on_settings;
         std::function<void()> on_quit;
     };

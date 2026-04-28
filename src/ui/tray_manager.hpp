@@ -4,12 +4,12 @@
 #ifndef BLINKBREAK_UI_TRAY_MANAGER_HPP
 #define BLINKBREAK_UI_TRAY_MANAGER_HPP
 
-#include "platform/platform_interface.hpp"
-
 #include <blinkbreak/types.hpp>
 
 #include <functional>
 #include <memory>
+
+#include "platform/platform_interface.hpp"
 
 namespace blinkbreak {
 
@@ -35,6 +35,10 @@ public:
     /// @brief Shows the tray icon.
     /// @return True if successful.
     bool Show();
+
+    /// @brief Sets the native host window used by the platform tray backend.
+    /// @param native_window_handle Platform-specific window handle.
+    void SetHostWindow(std::uintptr_t native_window_handle);
 
     /// @brief Hides the tray icon.
     void Hide();

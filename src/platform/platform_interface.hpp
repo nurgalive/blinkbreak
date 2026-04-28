@@ -51,6 +51,10 @@ public:
     /// @param callback The callback function.
     virtual void SetOnDoubleClick(std::function<void()> callback) = 0;
 
+    /// @brief Sets the native host window used for tray callbacks.
+    /// @param native_window_handle Platform window handle, or 0 if unavailable.
+    virtual void SetHostWindow(std::uintptr_t native_window_handle) = 0;
+
     /// @brief Updates the icon (e.g., to show different states).
     /// @param icon_id Identifier for the icon state.
     virtual void SetIcon(int icon_id) = 0;

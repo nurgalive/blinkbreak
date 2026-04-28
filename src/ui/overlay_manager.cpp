@@ -4,6 +4,7 @@
 #include "overlay_manager.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <format>
 #include <slint.h>
@@ -11,8 +12,14 @@
 #include <string>
 #include <utility>
 
-#include "overlay.h"
+#ifdef _WIN32
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+#endif
 
+#include "overlay.h"
 
 namespace blinkbreak {
 namespace {
@@ -83,6 +90,46 @@ void OverlayManager::Show(const BreakInfo& info) {
             ApplyProperties(instance);
             PositionOverlay(instance);
             (*instance.handle)->show();
+            // Force a small resize nudge to ensure the Slint software renderer
+            // updates its backing buffer on some GPU/DPI configurations where a
+            // newly created fullscreen window can appear blank.
+#ifdef _WIN32
+            HWND hwnd_nudge = (*instance.handle)->window().win32_hwnd();
+            if (hwnd_nudge) {
+                RECT r2{};
+                if (GetWindowRect(hwnd_nudge, &r2)) {
+                    const int w = r2.right - r2.left;
+                    const int h = r2.bottom - r2.top;
+                    // tweak size by +1 then restore after a short delay
+                    SetWindowPos(hwnd_nudge, nullptr, 0, 0, w + 1, h, SWP_NOMOVE | SWP_NOZORDER);
+                    slint::Timer::single_shot(std::chrono::milliseconds(50), [hwnd_nudge, w, h]() {
+                        SetWindowPos(hwnd_nudge, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER);
+                    });
+                }
+            }
+#endif
+            // Diagnostic: log native HWND and window rect so we can debug per-monitor
+            // placement issues (helps when high-DPI or multi-GPU setups misplace windows).
+#ifdef _WIN32
+            HWND hwnd = (*instance.handle)->window().win32_hwnd();
+            if (hwnd) {
+                RECT r{};
+                if (GetWindowRect(hwnd, &r)) {
+                    spdlog::debug("Overlay created for '{}' hwnd={} rect=({},{} {}x{}) dpi={}",
+                                  instance.monitor.name, reinterpret_cast<std::uintptr_t>(hwnd),
+                                  r.left, r.top, r.right - r.left, r.bottom - r.top,
+                                  instance.monitor.dpi);
+                } else {
+                    spdlog::warn(
+                        "Overlay created for '{}' hwnd={} but GetWindowRect failed, err={}",
+                        instance.monitor.name, reinterpret_cast<std::uintptr_t>(hwnd),
+                        GetLastError());
+                }
+            } else {
+                spdlog::warn("Overlay created for '{}' but native hwnd is null",
+                             instance.monitor.name);
+            }
+#endif
         }
         visible_ = !overlays_.empty();
         pending_show_ = false;

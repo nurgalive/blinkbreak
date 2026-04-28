@@ -157,6 +157,14 @@ private:
     /// @brief Shows a pre-break toast notification.
     void ShowPreBreakNotification(BreakType type, Duration time_until);
 
+    /// @brief Ensures the notification backend exists and is initialized.
+    /// @return True when notifications can be shown.
+    [[nodiscard]] bool EnsureNotificationManagerInitialized();
+
+    /// @brief Starts or stops live DND monitoring based on current needs.
+    /// @param should_enable Whether DND polling is required.
+    void EnsureDndDetectorState(bool should_enable);
+
     /// @brief Applies the configured theme to the main window.
     void ApplyThemeToMainWindow();
 
@@ -169,6 +177,15 @@ private:
     /// @return Latest DND state plus whether BlinkBreak should suppress UI.
     [[nodiscard]] std::pair<platform::DndState, bool> EvaluateDndSuppression(
         bool respect_dnd, bool respect_fullscreen);
+
+#ifdef _WIN32
+    /// @brief Gets the native HWND for the main Slint window when available.
+    /// @return Native window handle or nullptr.
+    [[nodiscard]] void* GetNativeMainWindowHandle() const;
+
+    /// @brief Restores the native main window and refreshes its software buffer.
+    void RestoreNativeMainWindow();
+#endif
 
     /// @brief Formats duration as MM:SS string.
     /// @param duration The duration to format.

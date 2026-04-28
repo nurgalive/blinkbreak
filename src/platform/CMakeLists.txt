@@ -41,6 +41,7 @@ if(WIN32)
     target_link_libraries(blinkbreak_platform
         PRIVATE
             shell32
+            comctl32
             Shcore
             WinToast::WinToast
             runtimeobject

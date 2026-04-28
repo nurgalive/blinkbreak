@@ -1,24 +1,14 @@
-/// @file tray_icon_win.cpp
-/// @brief Windows-specific system tray icon implementation.
-///
-/// Icons are loaded from embedded Win32 resources (see resources/blinkbreak.rc).
-/// NOTIFYICON_VERSION_4 is used for Windows 7+ compatibility.
-/// Tray icon size is determined at runtime via GetSystemMetrics(SM_CXSMICON).
-
 #ifdef _WIN32
 
     #include "tray_icon_win.hpp"
 
-    #include "../resources/resource.h"
+    #include <CommCtrl.h>
     #include <spdlog/spdlog.h>
 
+    #include "../resources/resource.h"
 
 namespace blinkbreak {
 namespace platform {
-
-// ---------------------------------------------------------------------------
-// Helper: load an icon resource at the system's small-icon size
-// ---------------------------------------------------------------------------
 
 HICON TrayIconWin::LoadIconResource(int resource_id) {
     const int cx = GetSystemMetrics(SM_CXSMICON);
@@ -35,43 +25,46 @@ HICON TrayIconWin::LoadIconResource(int resource_id) {
     return icon;
 }
 
-// ---------------------------------------------------------------------------
-// Construction / destruction
-// ---------------------------------------------------------------------------
+namespace {
+constexpr GUID kTrayIconGuid = {
+    0x9f6299e7, 0xe91a, 0x4aca, {0x81, 0xc6, 0xb6, 0xb8, 0x4d, 0x1f, 0x44, 0xaa}};
+constexpr UINT_PTR kTraySubclassId = 0x42425452;  // 'BBTR'
+
+NOTIFYICONDATAW BuildNotifyIconData(const NOTIFYICONDATAW& source, DWORD flags) {
+    NOTIFYICONDATAW data{};
+    data.cbSize = sizeof(data);
+    data.hWnd = source.hWnd;
+    data.uID = source.uID;
+    data.uFlags = flags;
+    data.uCallbackMessage = source.uCallbackMessage;
+    data.hIcon = source.hIcon;
+    data.uVersion = source.uVersion;
+    data.guidItem = source.guidItem;
+    if ((flags & NIF_TIP) != 0) {
+        wcsncpy_s(data.szTip, source.szTip, _TRUNCATE);
+    }
+    return data;
+}
+}  // namespace
 
 TrayIconWin::TrayIconWin()
-    : hwnd_(nullptr),
+    : host_window_(nullptr),
       hmenu_(nullptr),
       is_visible_(false),
+      subclass_installed_(false),
       icon_running_(nullptr),
       icon_paused_(nullptr) {
-    instance_ = this;
-
-    // Register window class
-    WNDCLASSEXW wc = {};
-    wc.cbSize = sizeof(wc);
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = GetModuleHandle(nullptr);
-    wc.lpszClassName = L"BlinkBreakTrayClass";
-    RegisterClassExW(&wc);
-
-    // Create hidden window
-    hwnd_ = CreateWindowExW(0, L"BlinkBreakTrayClass", L"BlinkBreak", 0, 0, 0, 0, 0, HWND_MESSAGE,
-                            nullptr, GetModuleHandle(nullptr), nullptr);
-
-    // Load icons from embedded resources
     icon_running_ = LoadIconResource(IDI_APP_BLUE);
     icon_paused_ = LoadIconResource(IDI_APP_YELLOW);
 
-    // Initialize tray icon data
     ZeroMemory(&nid_, sizeof(nid_));
     nid_.cbSize = sizeof(nid_);
-    nid_.hWnd = hwnd_;
     nid_.uID = 1;
-    nid_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_GUID;
     nid_.uCallbackMessage = kWmTrayIcon;
     nid_.uVersion = NOTIFYICON_VERSION_4;
     nid_.hIcon = icon_paused_ ? icon_paused_ : icon_running_;
+    nid_.guidItem = kTrayIconGuid;
     wcscpy_s(nid_.szTip, L"BlinkBreak");
 
     spdlog::debug("TrayIconWin created");
@@ -79,6 +72,15 @@ TrayIconWin::TrayIconWin()
 
 TrayIconWin::~TrayIconWin() {
     Hide();
+
+    if (subclass_installed_ && host_window_) {
+        RemoveWindowSubclass(host_window_, HostWindowSubclassProc, kTraySubclassId);
+        subclass_installed_ = false;
+    }
+
+    if (hmenu_) {
+        DestroyMenu(hmenu_);
+    }
     if (icon_running_) {
         DestroyIcon(icon_running_);
         icon_running_ = nullptr;
@@ -87,36 +89,29 @@ TrayIconWin::~TrayIconWin() {
         DestroyIcon(icon_paused_);
         icon_paused_ = nullptr;
     }
-    nid_.hIcon = nullptr;
-    if (hmenu_) {
-        DestroyMenu(hmenu_);
-    }
-    if (hwnd_) {
-        DestroyWindow(hwnd_);
-    }
-    instance_ = nullptr;
     spdlog::debug("TrayIconWin destroyed");
 }
-
-// ---------------------------------------------------------------------------
-// Public interface
-// ---------------------------------------------------------------------------
 
 bool TrayIconWin::Show() {
     if (is_visible_) {
         return true;
     }
-
-    if (Shell_NotifyIconW(NIM_ADD, &nid_)) {
-        // Request NOTIFYICON_VERSION_4 behaviour
-        Shell_NotifyIconW(NIM_SETVERSION, &nid_);
-        is_visible_ = true;
-        spdlog::info("Tray icon shown");
-        return true;
+    if (!nid_.hWnd) {
+        spdlog::warn("Tray icon cannot be shown before host window is assigned");
+        return false;
     }
 
-    spdlog::error("Failed to show tray icon");
-    return false;
+    auto add_data = BuildNotifyIconData(nid_, NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_GUID);
+    if (!Shell_NotifyIconW(NIM_ADD, &add_data)) {
+        spdlog::error("Failed to show tray icon");
+        return false;
+    }
+
+    auto version_data = BuildNotifyIconData(nid_, 0);
+    Shell_NotifyIconW(NIM_SETVERSION, &version_data);
+    is_visible_ = true;
+    spdlog::info("Tray icon shown");
+    return true;
 }
 
 void TrayIconWin::Hide() {
@@ -124,7 +119,8 @@ void TrayIconWin::Hide() {
         return;
     }
 
-    Shell_NotifyIconW(NIM_DELETE, &nid_);
+    auto delete_data = BuildNotifyIconData(nid_, 0);
+    Shell_NotifyIconW(NIM_DELETE, &delete_data);
     is_visible_ = false;
     spdlog::info("Tray icon hidden");
 }
@@ -134,7 +130,8 @@ void TrayIconWin::SetTooltip(const std::string& tooltip) {
     wcsncpy_s(nid_.szTip, wide_tooltip.c_str(), _TRUNCATE);
 
     if (is_visible_) {
-        Shell_NotifyIconW(NIM_MODIFY, &nid_);
+        auto modify_data = BuildNotifyIconData(nid_, NIF_TIP | NIF_GUID);
+        Shell_NotifyIconW(NIM_MODIFY, &modify_data);
     }
 }
 
@@ -150,15 +147,18 @@ void TrayIconWin::SetMenu(const std::vector<MenuItem>& items) {
         const auto& item = items[i];
         if (item.is_separator) {
             AppendMenuW(hmenu_, MF_SEPARATOR, 0, nullptr);
-        } else {
-            std::wstring wide_text(item.text.begin(), item.text.end());
-            UINT flags = MF_STRING;
-            if (!item.enabled)
-                flags |= MF_GRAYED;
-            if (item.checked)
-                flags |= MF_CHECKED;
-            AppendMenuW(hmenu_, flags, i + 1, wide_text.c_str());
+            continue;
         }
+
+        std::wstring wide_text(item.text.begin(), item.text.end());
+        UINT flags = MF_STRING;
+        if (!item.enabled) {
+            flags |= MF_GRAYED;
+        }
+        if (item.checked) {
+            flags |= MF_CHECKED;
+        }
+        AppendMenuW(hmenu_, flags, kFirstMenuItemId + static_cast<UINT>(i), wide_text.c_str());
     }
 }
 
@@ -168,6 +168,35 @@ void TrayIconWin::SetOnClick(std::function<void()> callback) {
 
 void TrayIconWin::SetOnDoubleClick(std::function<void()> callback) {
     on_double_click_ = std::move(callback);
+}
+
+void TrayIconWin::SetHostWindow(std::uintptr_t native_window_handle) {
+    HWND new_host = reinterpret_cast<HWND>(native_window_handle);
+    if (host_window_ == new_host) {
+        return;
+    }
+
+    if (subclass_installed_ && host_window_) {
+        RemoveWindowSubclass(host_window_, HostWindowSubclassProc, kTraySubclassId);
+        subclass_installed_ = false;
+    }
+
+    host_window_ = new_host;
+    nid_.hWnd = host_window_;
+
+    if (!host_window_) {
+        return;
+    }
+
+    if (!SetWindowSubclass(host_window_, HostWindowSubclassProc, kTraySubclassId,
+                           reinterpret_cast<DWORD_PTR>(this))) {
+        spdlog::error("SetWindowSubclass failed, error={}", GetLastError());
+        host_window_ = nullptr;
+        nid_.hWnd = nullptr;
+        return;
+    }
+
+    subclass_installed_ = true;
 }
 
 void TrayIconWin::SetIcon(int icon_id) {
@@ -183,65 +212,74 @@ void TrayIconWin::SetIcon(int icon_id) {
     }
 
     nid_.hIcon = selected_icon;
-
     if (is_visible_) {
-        Shell_NotifyIconW(NIM_MODIFY, &nid_);
+        auto modify_data = BuildNotifyIconData(nid_, NIF_ICON | NIF_GUID);
+        Shell_NotifyIconW(NIM_MODIFY, &modify_data);
     }
 }
 
-// ---------------------------------------------------------------------------
-// Window procedure
-// ---------------------------------------------------------------------------
+LRESULT CALLBACK TrayIconWin::HostWindowSubclassProc(HWND hwnd, UINT msg, WPARAM wparam,
+                                                     LPARAM lparam, UINT_PTR subclass_id,
+                                                     DWORD_PTR ref_data) {
+    auto* self = reinterpret_cast<TrayIconWin*>(ref_data);
+    if (!self) {
+        return DefSubclassProc(hwnd, msg, wparam, lparam);
+    }
 
-LRESULT CALLBACK TrayIconWin::WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
-    if (msg == kWmTrayIcon && instance_) {
+    if (msg == kWmTrayIcon) {
         switch (LOWORD(lparam)) {
             case WM_LBUTTONUP:
-                if (instance_->on_click_) {
-                    instance_->on_click_();
+                if (self->on_click_) {
+                    self->on_click_();
                 }
-                break;
+                return 0;
             case WM_LBUTTONDBLCLK:
-                if (instance_->on_double_click_) {
-                    instance_->on_double_click_();
+                if (self->on_double_click_) {
+                    self->on_double_click_();
                 }
-                break;
+                return 0;
             case WM_RBUTTONUP:
-                instance_->ShowContextMenu();
-                break;
+                self->ShowContextMenu();
+                return 0;
         }
-        return 0;
     }
 
-    if (msg == WM_COMMAND && instance_) {
-        UINT id = LOWORD(wparam);
-        if (id > 0 && id <= instance_->menu_items_.size()) {
-            const auto& item = instance_->menu_items_[id - 1];
-            if (item.callback && item.enabled) {
-                item.callback();
+    if (msg == WM_COMMAND) {
+        const UINT id = LOWORD(wparam);
+        if (id >= kFirstMenuItemId) {
+            const size_t index = static_cast<size_t>(id - kFirstMenuItemId);
+            if (index < self->menu_items_.size()) {
+                const auto& item = self->menu_items_[index];
+                if (item.callback && item.enabled) {
+                    item.callback();
+                }
+                return 0;
             }
         }
-        return 0;
     }
 
-    return DefWindowProcW(hwnd, msg, wparam, lparam);
+    if (msg == WM_NCDESTROY) {
+        RemoveWindowSubclass(hwnd, HostWindowSubclassProc, subclass_id);
+        self->subclass_installed_ = false;
+        self->host_window_ = nullptr;
+        self->nid_.hWnd = nullptr;
+    }
+
+    return DefSubclassProc(hwnd, msg, wparam, lparam);
 }
 
 void TrayIconWin::ShowContextMenu() {
-    if (!hmenu_)
+    if (!hmenu_ || !host_window_) {
         return;
+    }
 
     POINT pt;
     GetCursorPos(&pt);
 
-    SetForegroundWindow(hwnd_);
-    TrackPopupMenu(hmenu_, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd_, nullptr);
-    PostMessage(hwnd_, WM_NULL, 0, 0);
+    SetForegroundWindow(host_window_);
+    TrackPopupMenu(hmenu_, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, host_window_, nullptr);
+    PostMessage(host_window_, WM_NULL, 0, 0);
 }
-
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
 
 std::unique_ptr<ITrayIcon> CreateTrayIcon() {
     return std::make_unique<TrayIconWin>();

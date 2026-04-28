@@ -3,3 +3,4 @@ build/
 node_modules/
 .serena/*
 !.serena/project.yml
+tmp/

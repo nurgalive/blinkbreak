@@ -3,9 +3,8 @@
 
 #include "tray_manager.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <format>
+#include <spdlog/spdlog.h>
 
 namespace blinkbreak {
 
@@ -34,6 +33,10 @@ bool TrayManager::Show() {
     return tray_icon_->Show();
 }
 
+void TrayManager::SetHostWindow(std::uintptr_t native_window_handle) {
+    tray_icon_->SetHostWindow(native_window_handle);
+}
+
 void TrayManager::Hide() {
     tray_icon_->Hide();
 }
@@ -44,8 +47,8 @@ void TrayManager::UpdateStatus(bool is_running, Duration time_until_break, Break
     if (is_running) {
         auto minutes = time_until_break.count() / 60;
         auto seconds = time_until_break.count() % 60;
-        tooltip = std::format("BlinkBreak - {} break in {:02}:{:02}",
-                              BreakTypeToString(break_type), minutes, seconds);
+        tooltip = std::format("BlinkBreak - {} break in {:02}:{:02}", BreakTypeToString(break_type),
+                              minutes, seconds);
     } else {
         tooltip = "BlinkBreak - Paused";
     }
@@ -64,45 +67,29 @@ void TrayManager::UpdateMenu(bool is_running) {
     tray_icon_->SetIcon(is_running ? 1 : 0);
 
     // Show window
-    items.push_back({
-        .text = "Show BlinkBreak",
-        .callback = callbacks_.on_show_window,
-        .enabled = true
-    });
+    items.push_back(
+        {.text = "Show BlinkBreak", .callback = callbacks_.on_show_window, .enabled = true});
 
     items.push_back({.is_separator = true});
 
     // Start/Pause
-    items.push_back({
-        .text = is_running ? "Pause" : "Start",
-        .callback = callbacks_.on_start_pause,
-        .enabled = true
-    });
+    items.push_back({.text = is_running ? "Pause" : "Start",
+                     .callback = callbacks_.on_start_pause,
+                     .enabled = true});
 
     // Skip next break
-    items.push_back({
-        .text = "Skip Next Break",
-        .callback = callbacks_.on_skip,
-        .enabled = is_running
-    });
+    items.push_back(
+        {.text = "Skip Next Break", .callback = callbacks_.on_skip, .enabled = is_running});
 
     items.push_back({.is_separator = true});
 
     // Settings
-    items.push_back({
-        .text = "Settings...",
-        .callback = callbacks_.on_settings,
-        .enabled = true
-    });
+    items.push_back({.text = "Settings...", .callback = callbacks_.on_settings, .enabled = true});
 
     items.push_back({.is_separator = true});
 
     // Quit
-    items.push_back({
-        .text = "Quit",
-        .callback = callbacks_.on_quit,
-        .enabled = true
-    });
+    items.push_back({.text = "Quit", .callback = callbacks_.on_quit, .enabled = true});
 
     tray_icon_->SetMenu(items);
 }

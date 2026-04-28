@@ -29,6 +29,11 @@ std::string ToStdString(const slint::SharedString& value) {
     return std::string(value.data(), value.size());
 }
 
+bool EnvFlagEnabled(const char* name) {
+    const char* value = std::getenv(name);
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+}
+
 std::optional<int> ParsePositiveInt(const std::string& text) {
     if (text.empty()) {
         return std::nullopt;
@@ -53,16 +58,22 @@ void ApplyThemeProperties(const slint::ComponentHandle<T>& component, const Them
 }
 
 #ifdef _WIN32
-/// @brief Finds the native HWND of a window by its title.
-/// FindWindowW does not search HWND_MESSAGE windows, so it won't return
-/// the tray icon's hidden message window even though it shares the same title.
-HWND FindWindowByTitle(const wchar_t* title) {
-    HWND hwnd = FindWindowW(nullptr, title);
+void NudgeWindowSize(HWND hwnd) {
     if (!hwnd) {
-        spdlog::warn("FindWindowByTitle: could not find '{}'",
-                     std::string(title, title + wcslen(title)));
+        return;
     }
-    return hwnd;
+
+    RECT rect{};
+    if (!GetWindowRect(hwnd, &rect)) {
+        return;
+    }
+
+    const int width = rect.right - rect.left;
+    const int height = rect.bottom - rect.top;
+    SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height, SWP_NOMOVE | SWP_NOZORDER);
+    slint::Timer::single_shot(std::chrono::milliseconds(50), [hwnd, width, height]() {
+        SetWindowPos(hwnd, nullptr, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
+    });
 }
 #endif
 
@@ -108,6 +119,26 @@ AppController::~AppController() {
     }
     spdlog::debug("AppController destroyed");
 }
+
+#ifdef _WIN32
+void* AppController::GetNativeMainWindowHandle() const {
+    if (!main_window_) {
+        return nullptr;
+    }
+    return (*main_window_)->window().win32_hwnd();
+}
+
+void AppController::RestoreNativeMainWindow() {
+    auto* hwnd = static_cast<HWND>(GetNativeMainWindowHandle());
+    if (!hwnd) {
+        return;
+    }
+
+    ShowWindow(hwnd, SW_SHOW);
+    SetForegroundWindow(hwnd);
+    NudgeWindowSize(hwnd);
+}
+#endif
 
 bool AppController::Initialize() {
     spdlog::info("Initializing AppController");
@@ -186,19 +217,8 @@ bool AppController::Initialize() {
         spdlog::info("Idle detection disabled");
     }
 
-    // Create DND detector for Focus Assist / Do Not Disturb monitoring
-    dnd_detector_ = platform::CreateDndDetector();
-    if (dnd_detector_) {
-        dnd_detector_->SetOnDndChange([this](bool is_dnd_active) {
-            spdlog::info("DND state changed: {}", is_dnd_active ? "active" : "inactive");
-        });
-        dnd_detector_->Start();
-        const auto initial_state = dnd_detector_->RefreshState();
-        spdlog::info(
-            "DND detection enabled (initial state: {}, respect_dnd={}, respect_fullscreen={})",
-            platform::DndStateToString(initial_state), config_.notification.respect_dnd,
-            config_.notification.respect_fullscreen);
-    }
+    EnsureDndDetectorState(config_.notification.respect_dnd ||
+                           config_.notification.respect_fullscreen);
 
     scheduler_->SetOnBreakStart([this](const BreakInfo& info) {
         // Check DND suppression FIRST - before any state transitions
@@ -359,7 +379,7 @@ bool AppController::Initialize() {
     ui->window().on_close_requested([this]() {
         spdlog::debug("Window close requested - hiding to tray");
 #ifdef _WIN32
-        HWND hwnd = FindWindowByTitle(L"BlinkBreak");
+        auto* hwnd = static_cast<HWND>(GetNativeMainWindowHandle());
         if (hwnd) {
             ShowWindow(hwnd, SW_HIDE);
         }
@@ -386,19 +406,8 @@ bool AppController::Initialize() {
     ui->set_idle_time(slint::SharedString(idle_time_));
     ApplyThemeProperties(*main_window_, config_.theme);
 
-    // Initialize notification manager
-    notification_manager_ = platform::CreateNotificationManager();
-    if (notification_manager_) {
-        if (notification_manager_->IsSupported()) {
-            if (!notification_manager_->Initialize()) {
-                spdlog::warn("Notification manager initialization failed");
-            }
-        } else {
-            spdlog::warn("Toast notifications are not supported on this system");
-        }
-        notification_manager_->SetOnAction([this](platform::NotificationAction action) {
-            slint::invoke_from_event_loop([this, action]() { OnNotificationAction(action); });
-        });
+    if (config_.notification.enabled) {
+        static_cast<void>(EnsureNotificationManagerInitialized());
     }
 
     // Initialize tray manager
@@ -407,26 +416,7 @@ bool AppController::Initialize() {
             [this]() {
                 spdlog::debug("Tray: Show window");
 #ifdef _WIN32
-                HWND hwnd = FindWindowByTitle(L"BlinkBreak");
-                if (hwnd) {
-                    ShowWindow(hwnd, SW_SHOW);
-                    SetForegroundWindow(hwnd);
-
-                    // Workaround for winit-software renderer bug:
-                    // Force a physical resize event so Slint recreates its pixel buffer.
-                    RECT rect;
-                    if (GetWindowRect(hwnd, &rect)) {
-                        int width = rect.right - rect.left;
-                        int height = rect.bottom - rect.top;
-                        SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height,
-                                     SWP_NOMOVE | SWP_NOZORDER);
-                        slint::Timer::single_shot(
-                            std::chrono::milliseconds(50), [hwnd, width, height]() {
-                                SetWindowPos(hwnd, nullptr, 0, 0, width, height,
-                                             SWP_NOMOVE | SWP_NOZORDER);
-                            });
-                    }
-                }
+                RestoreNativeMainWindow();
 #else
                 if (main_window_) {
                     (*main_window_)->show();
@@ -464,7 +454,6 @@ bool AppController::Initialize() {
             }};
 
     tray_manager_ = std::make_unique<TrayManager>(std::move(tray_callbacks));
-    tray_manager_->Show();
     tray_manager_->UpdateStatus(is_running_, config_.short_break.interval,
                                 scheduler_->GetNextBreakType());
 
@@ -495,6 +484,52 @@ int AppController::Run() {
     if (main_window_) {
         (*main_window_)->show();
     }
+
+#ifdef _WIN32
+    if (tray_manager_ && main_window_) {
+        // Defer host window assignment and Show() until the Slint native window
+        // is ready. Calling win32_hwnd() immediately after show() may return
+        // nullptr on some setups. Queue the operation to run on the Slint
+        // event loop so the native window has time to be created.
+        slint::invoke_from_event_loop([this]() {
+            constexpr int kMaxAttempts = 10;
+            constexpr std::chrono::milliseconds kAttemptDelay{50};
+
+            // Attempt loop using a recursive single_shot until we get a valid HWND
+            std::function<void(int)> attempt_set_host = [this, kAttemptDelay, kMaxAttempts,
+                                                         &attempt_set_host](int attempt) {
+                if (!tray_manager_ || !main_window_) {
+                    return;
+                }
+                const HWND hwnd = (*main_window_)->window().win32_hwnd();
+                spdlog::debug("Attempting to assign tray host window (attempt {}) hwnd={}", attempt,
+                              reinterpret_cast<std::uintptr_t>(hwnd));
+                if (hwnd) {
+                    tray_manager_->SetHostWindow(reinterpret_cast<std::uintptr_t>(hwnd));
+                    if (!tray_manager_->Show()) {
+                        spdlog::warn("TrayManager::Show() returned false after host assignment");
+                    }
+                    return;
+                }
+                if (attempt < kMaxAttempts) {
+                    slint::Timer::single_shot(kAttemptDelay, [attempt, &attempt_set_host]() {
+                        attempt_set_host(attempt + 1);
+                    });
+                } else {
+                    spdlog::warn(
+                        "Failed to obtain native main window handle for tray after {} attempts",
+                        kMaxAttempts);
+                }
+            };
+
+            attempt_set_host(1);
+        });
+    }
+#else
+    if (tray_manager_) {
+        tray_manager_->Show();
+    }
+#endif
 
     // Run the event loop (keep running even if no windows are visible)
     slint::run_event_loop(slint::EventLoopMode::RunUntilQuit);
@@ -738,6 +773,11 @@ void AppController::OnOpenSettings() {
                 "respect_fullscreen={}",
                 updated.notification.enabled, updated.notification.warning_time.count(),
                 updated.notification.respect_dnd, updated.notification.respect_fullscreen);
+            EnsureDndDetectorState(updated.notification.respect_dnd ||
+                                   updated.notification.respect_fullscreen);
+            if (updated.notification.enabled) {
+                static_cast<void>(EnsureNotificationManagerInitialized());
+            }
             if (!updated.notification.enabled && notification_manager_) {
                 int64_t toast_id = -1;
                 {
@@ -1245,21 +1285,7 @@ void AppController::OnNotificationAction(platform::NotificationAction action) {
 
     if (action == platform::NotificationAction::Clicked) {
 #ifdef _WIN32
-        HWND hwnd = FindWindowByTitle(L"BlinkBreak");
-        if (hwnd) {
-            ShowWindow(hwnd, SW_SHOW);
-            SetForegroundWindow(hwnd);
-
-            RECT rect;
-            if (GetWindowRect(hwnd, &rect)) {
-                int width = rect.right - rect.left;
-                int height = rect.bottom - rect.top;
-                SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height, SWP_NOMOVE | SWP_NOZORDER);
-                slint::Timer::single_shot(std::chrono::milliseconds(50), [hwnd, width, height]() {
-                    SetWindowPos(hwnd, nullptr, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
-                });
-            }
-        }
+        RestoreNativeMainWindow();
 #else
         if (main_window_) {
             (*main_window_)->show();
@@ -1315,7 +1341,7 @@ void AppController::ShowPreBreakNotification(BreakType type, Duration time_until
     if (!notification_config.enabled) {
         return;
     }
-    if (!notification_manager_ || !notification_manager_->IsSupported()) {
+    if (!EnsureNotificationManagerInitialized()) {
         return;
     }
 
@@ -1346,6 +1372,67 @@ void AppController::ShowPreBreakNotification(BreakType type, Duration time_until
     {
         std::lock_guard lock(mutex_);
         active_toast_id_ = toast_id;
+    }
+}
+
+bool AppController::EnsureNotificationManagerInitialized() {
+    if (!notification_manager_) {
+        notification_manager_ = platform::CreateNotificationManager();
+        if (!notification_manager_) {
+            spdlog::warn("Failed to create notification manager");
+            return false;
+        }
+
+        notification_manager_->SetOnAction([this](platform::NotificationAction action) {
+            slint::invoke_from_event_loop([this, action]() { OnNotificationAction(action); });
+        });
+    }
+
+    if (!notification_manager_->IsSupported()) {
+        spdlog::warn("Toast notifications are not supported on this system");
+        return false;
+    }
+
+    if (!notification_manager_->Initialize()) {
+        spdlog::warn("Notification manager initialization failed");
+        return false;
+    }
+
+    return true;
+}
+
+void AppController::EnsureDndDetectorState(bool should_enable) {
+    if (EnvFlagEnabled("BLINKBREAK_DISABLE_DND")) {
+        if (dnd_detector_ && dnd_detector_->IsRunning()) {
+            dnd_detector_->Stop();
+        }
+        return;
+    }
+
+    if (!dnd_detector_) {
+        dnd_detector_ = platform::CreateDndDetector();
+        if (!dnd_detector_) {
+            return;
+        }
+
+        dnd_detector_->SetOnDndChange([this](bool is_dnd_active) {
+            spdlog::info("DND state changed: {}", is_dnd_active ? "active" : "inactive");
+        });
+    }
+
+    if (should_enable) {
+        dnd_detector_->Start();
+        const auto initial_state = dnd_detector_->RefreshState();
+        spdlog::info(
+            "DND detection enabled (initial state: {}, respect_dnd={}, respect_fullscreen={})",
+            platform::DndStateToString(initial_state), config_.notification.respect_dnd,
+            config_.notification.respect_fullscreen);
+        return;
+    }
+
+    if (dnd_detector_->IsRunning()) {
+        dnd_detector_->Stop();
+        spdlog::info("DND detection disabled");
     }
 }
 

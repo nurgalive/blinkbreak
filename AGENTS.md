@@ -170,21 +170,58 @@
   - [Stage 11: Do Not Disturb Detection](#stage-11-do-not-disturb-detection)
     - [Goal](#goal-10)
     - [Prerequisites](#prerequisites-10)
+    - [Background: Windows DND APIs](#background-windows-dnd-apis)
     - [Implementation Steps](#implementation-steps-10)
       - [11.1 Create DND Detector Interface](#111-create-dnd-detector-interface)
       - [11.2 Create Windows DND Detector Header](#112-create-windows-dnd-detector-header)
+      - [11.3 Create Windows DND Detector Implementation](#113-create-windows-dnd-detector-implementation)
+      - [11.4 Update Platform CMakeLists.txt](#114-update-platform-cmakeliststxt)
+      - [11.5 Refactor AppController DND Integration](#115-refactor-appcontroller-dnd-integration)
+      - [11.6 Extend Configuration for Overlay DND Behavior](#116-extend-configuration-for-overlay-dnd-behavior)
+      - [11.7 Settings Dialog UI Update](#117-settings-dialog-ui-update)
+    - [Test Requirements](#test-requirements-10)
+      - [Unit Tests](#unit-tests-8)
+      - [UI Tests](#ui-tests-3)
+      - [Integration Tests (Stage 12)](#integration-tests-stage-12)
+    - [Verification Criteria](#verification-criteria-9)
+    - [Validation Commands](#validation-commands-2)
     - [Deliverables](#deliverables-10)
+    - [Implementation Notes](#implementation-notes)
   - [Stage 12: Integration Tests \& Polish](#stage-12-integration-tests--polish)
     - [Goal](#goal-11)
     - [Prerequisites](#prerequisites-11)
-    - [Implementation Steps](#implementation-steps-11)
-      - [12.1 Create Integration Test Harness](#121-create-integration-test-harness)
-      - [12.2 Integration Tests](#122-integration-tests)
-      - [12.3 Performance Testing](#123-performance-testing)
-      - [12.4 Final Polish](#124-final-polish)
-    - [Test Requirements](#test-requirements-10)
-      - [Integration Tests](#integration-tests)
-      - [Verification Criteria](#verification-criteria-9)
+    - [12.1 Integration Test Harness](#121-integration-test-harness)
+      - [12.1.1 Mock Platform Layer](#1211-mock-platform-layer)
+      - [12.1.2 Test Harness Class](#1212-test-harness-class)
+      - [12.1.3 Test Harness Implementation](#1213-test-harness-implementation)
+    - [12.2 Integration Tests](#122-integration-tests)
+      - [12.2.1 Full Break Cycle Workflow Tests](#1221-full-break-cycle-workflow-tests)
+      - [12.2.2 Idle Detection Integration Tests](#1222-idle-detection-integration-tests)
+      - [12.2.3 DND Integration Tests](#1223-dnd-integration-tests)
+      - [12.2.4 Configuration Runtime Change Tests](#1224-configuration-runtime-change-tests)
+      - [12.2.5 Extended Simulation Tests](#1225-extended-simulation-tests)
+    - [12.3 Performance Testing](#123-performance-testing)
+      - [12.3.1 Memory Usage Profiling](#1231-memory-usage-profiling)
+      - [12.3.2 CPU Usage Benchmark](#1232-cpu-usage-benchmark)
+      - [12.3.3 Startup Time Measurement](#1233-startup-time-measurement)
+    - [12.4 Code Quality \& Static Analysis](#124-code-quality--static-analysis)
+      - [12.4.1 Clang-Tidy Integration](#1241-clang-tidy-integration)
+      - [12.4.2 Code Coverage Configuration](#1242-code-coverage-configuration)
+      - [12.4.3 Static Analysis Script](#1243-static-analysis-script)
+    - [12.5 Documentation Generation](#125-documentation-generation)
+      - [12.5.1 Doxygen Configuration](#1251-doxygen-configuration)
+      - [12.5.2 API Documentation Requirements](#1252-api-documentation-requirements)
+    - [12.6 Release Preparation](#126-release-preparation)
+      - [12.6.1 Version Bump Script](#1261-version-bump-script)
+      - [12.6.2 Release Checklist](#1262-release-checklist)
+    - [12.7 CMake Updates](#127-cmake-updates)
+      - [12.7.1 Integration Test Target](#1271-integration-test-target)
+    - [Test Requirements](#test-requirements-11)
+      - [Integration Tests (25+ tests)](#integration-tests-25-tests)
+      - [Performance Tests (6+ tests)](#performance-tests-6-tests)
+      - [Verification Criteria](#verification-criteria-10)
+      - [Validation Commands](#validation-commands-3)
+      - [Validation Results](#validation-results-1)
     - [Deliverables](#deliverables-11)
   - [Appendix A: Testing Commands Reference](#appendix-a-testing-commands-reference)
   - [Appendix B: Code Quality Commands](#appendix-b-code-quality-commands)
@@ -1393,7 +1430,7 @@ Implemented `NotificationManagerWin` in `src/platform/windows/notification_win.h
 
 Key implementation details:
 
-1. Configures WinToast with the BlinkBreak app name and AUMI.
+1. Configures WinToast with the BlinkBreak app name.
 2. Initializes from the main/UI thread after Slint COM setup to avoid `RPC_E_CHANGED_MODE`.
 3. Uses two-action toasts for pre-break warnings: **Skip break** and **Snooze break**.
 4. Relays WinToast callbacks back onto the Slint event loop before touching application state.
@@ -1543,14 +1580,14 @@ Windows provides the `SHQueryUserNotificationState()` API (shellapi.h) which ret
 
 To resolve the Markdown Linter warning **MD060** ("Table column style"), ensure each separator row uses consistent alignment markers—ideally defaulting to left-aligned (`|---|`) across all columns. Additionally, remove backtick escaping within table cells and normalize whitespace.
 
-| Value | Constant | Meaning |
-| --- | --- | --- |
-| 1 | QUNS_NOT_PRESENT | Screen saver running, machine locked, or Fast User Switching |
-| 2 | QUNS_BUSY | Full-screen app running or Presentation Settings enabled |
-| 3 | QUNS_RUNNING_D3D_FULL_SCREEN | Full-screen exclusive D3D application |
-| 4 | QUNS_PRESENTATION_MODE | Windows Presentation Settings explicitly enabled |
-| 5 | QUNS_ACCEPTS_NOTIFICATIONS | Normal state — notifications allowed |
-| 6 | QUNS_QUIET_TIME | Quiet Time (legacy behavior) |
+| Value | Constant                     | Meaning                                                      |
+| ----- | ---------------------------- | ------------------------------------------------------------ |
+| 1     | QUNS_NOT_PRESENT             | Screen saver running, machine locked, or Fast User Switching |
+| 2     | QUNS_BUSY                    | Full-screen app running or Presentation Settings enabled     |
+| 3     | QUNS_RUNNING_D3D_FULL_SCREEN | Full-screen exclusive D3D application                        |
+| 4     | QUNS_PRESENTATION_MODE       | Windows Presentation Settings explicitly enabled             |
+| 5     | QUNS_ACCEPTS_NOTIFICATIONS   | Normal state — notifications allowed                         |
+| 6     | QUNS_QUIET_TIME              | Quiet Time (legacy behavior)                                 |
 
 **Note:** `SHQueryUserNotificationState()` is still useful as a fallback, but it does **not** reliably expose the plain Windows 11 Do Not Disturb toggle on its own. In practice it often reports `QUNS_ACCEPTS_NOTIFICATIONS` until BlinkBreak's own fullscreen overlay appears, which is too late for suppression. Stage 11 therefore combines three signals in order: WinRT Focus session state, Windows 11 Quiet Hours / Do Not Disturb profile data via `readCloudDataSettings.exe`, and finally the legacy shell API as a fallback.
 
@@ -1605,23 +1642,9 @@ Updated `ui/components/settings_dialog.slint` to clarify the DND behavior and ad
 
 Create `tests/unit/test_dnd_detector.cpp`:
 
-**MockDndDetector tests (8 tests):**\n\n1. `MockDndDetector_InitialState` — Default state is `AcceptsNotifications`, `IsDndActive()` returns false
-2. `MockDndDetector_StartAndStop` — `Start()` sets running, `Stop()` clears it
-3. `MockDndDetector_SetAndGetState` — Can set state, `GetState()` returns it
-4. `MockDndDetector_IsDndActiveForEachState` — Test `IsDndActive()` returns correct value for each `DndState`
-5. `MockDndDetector_CallbackTriggeredOnChange` — Callback fires when state changes from active to inactive
-6. `MockDndDetector_CallbackNotTriggeredOnSameState` — Callback does not fire if state stays the same
-7. `MockDndDetector_PollingIntervalCanBeSet` — `SetPollingInterval()` updates interval
-8. `MockDndDetector_NullCallbackHandled` — Setting null callback does not crash
+**MockDndDetector tests (8 tests):**\n\n1. `MockDndDetector_InitialState` — Default state is `AcceptsNotifications`, `IsDndActive()` returns false 2. `MockDndDetector_StartAndStop` — `Start()` sets running, `Stop()` clears it 3. `MockDndDetector_SetAndGetState` — Can set state, `GetState()` returns it 4. `MockDndDetector_IsDndActiveForEachState` — Test `IsDndActive()` returns correct value for each `DndState` 5. `MockDndDetector_CallbackTriggeredOnChange` — Callback fires when state changes from active to inactive 6. `MockDndDetector_CallbackNotTriggeredOnSameState` — Callback does not fire if state stays the same 7. `MockDndDetector_PollingIntervalCanBeSet` — `SetPollingInterval()` updates interval 8. `MockDndDetector_NullCallbackHandled` — Setting null callback does not crash
 
-**DndDetectorWin tests (8 tests):**\n\n1. `DndDetectorWin_CreateDndDetector` — `CreateDndDetector()` returns non-null
-2. `DndDetectorWin_InitialState` — Not running, state is `AcceptsNotifications` or current system state
-3. `DndDetectorWin_StartAndStop` — Lifecycle works correctly
-4. `DndDetectorWin_StartTwiceIsNoOp` — Double-start does not crash
-5. `DndDetectorWin_StopWhenNotRunningIsNoOp` — Double-stop does not crash
-6. `DndDetectorWin_GetStateReturnsValidEnum` — `GetState()` returns a valid `DndState` value
-7. `DndDetectorWin_IsDndActiveMatchesState` — `IsDndActive()` consistent with `GetState()`
-8. `DndDetectorWin_CallbackCanBeSet` — Setting callback does not crash
+**DndDetectorWin tests (8 tests):**\n\n1. `DndDetectorWin_CreateDndDetector` — `CreateDndDetector()` returns non-null 2. `DndDetectorWin_InitialState` — Not running, state is `AcceptsNotifications` or current system state 3. `DndDetectorWin_StartAndStop` — Lifecycle works correctly 4. `DndDetectorWin_StartTwiceIsNoOp` — Double-start does not crash 5. `DndDetectorWin_StopWhenNotRunningIsNoOp` — Double-stop does not crash 6. `DndDetectorWin_GetStateReturnsValidEnum` — `GetState()` returns a valid `DndState` value 7. `DndDetectorWin_IsDndActiveMatchesState` — `IsDndActive()` consistent with `GetState()` 8. `DndDetectorWin_CallbackCanBeSet` — Setting callback does not crash
 
 **DndStateToString tests (1 test):**\n\n1. `DndStateToString_AllValues` — Each enum value maps to expected string
 
@@ -1739,95 +1762,1431 @@ Validation results:
 
 ### Goal
 
-Comprehensive integration testing, performance optimization, and final polish.
+Comprehensive integration testing, performance optimization, code quality verification, and final polish to produce a production-ready release. This stage ensures all components work together seamlessly, the application performs well under real-world conditions, and the codebase meets professional quality standards.
 
 ### Prerequisites
 
-- All previous stages completed
+- All previous stages (1-11) completed successfully
+- All 199 tests pass (174 unit + 25 UI)
+- Application runs without crashes during manual testing
 
-### Implementation Steps
+---
 
-#### 12.1 Create Integration Test Harness
+### 12.1 Integration Test Harness
+
+Create a reusable test harness that enables end-to-end testing of the application workflow without requiring actual time delays or user interaction.
+
+#### 12.1.1 Mock Platform Layer
+
+Create `tests/integration/mock_platform.hpp`:
+
+```cpp
+#pragma once
+
+#include "platform/platform_interface.hpp"
+#include <chrono>
+#include <functional>
+#include <vector>
+#include <mutex>
+
+namespace blinkbreak::testing {
+
+using Duration = std::chrono::milliseconds;
+using TimePoint = std::chrono::steady_clock::time_point;
+
+/// @brief Mock idle detector for integration testing.
+class MockIdleDetector : public IIdleDetector {
+public:
+    void Start() override { running_ = true; }
+    void Stop() override { running_ = false; }
+    bool IsRunning() const override { return running_; }
+
+    Duration GetIdleTime() const override { return simulated_idle_time_; }
+    bool IsIdle() const override { return simulated_idle_time_ >= threshold_; }
+
+    void SetIdleThreshold(Duration threshold) override { threshold_ = threshold; }
+    Duration GetIdleThreshold() const override { return threshold_; }
+
+    void SetOnIdle(std::function<void()> callback) override { on_idle_ = std::move(callback); }
+    void SetOnActive(std::function<void()> callback) override { on_active_ = std::move(callback); }
+
+    // Test control methods
+    void SimulateIdle(Duration duration);
+    void SimulateActivity();
+    void TriggerIdleCallback();
+    void TriggerActiveCallback();
+
+private:
+    bool running_ = false;
+    Duration simulated_idle_time_{0};
+    Duration threshold_{std::chrono::minutes(5)};
+    std::function<void()> on_idle_;
+    std::function<void()> on_active_;
+};
+
+/// @brief Mock DND detector for integration testing.
+class MockDndDetector : public IDndDetector {
+public:
+    void Start() override { running_ = true; }
+    void Stop() override { running_ = false; }
+    bool IsRunning() const override { return running_; }
+
+    DndState GetState() const override { return state_; }
+    bool IsDndActive() const override;
+    void RefreshState() override {}
+    bool IsFullScreenDetected() const override { return fullscreen_; }
+
+    void SetPollingInterval(Duration interval) override { interval_ = interval; }
+    Duration GetPollingInterval() const override { return interval_; }
+    void SetOnStateChange(std::function<void(DndState)> callback) override { on_change_ = std::move(callback); }
+
+    // Test control methods
+    void SetState(DndState state);
+    void SetFullScreen(bool fullscreen);
+
+private:
+    bool running_ = false;
+    DndState state_ = DndState::AcceptsNotifications;
+    bool fullscreen_ = false;
+    Duration interval_{std::chrono::seconds(1)};
+    std::function<void(DndState)> on_change_;
+};
+
+/// @brief Mock notification manager for integration testing.
+class MockNotificationManager : public INotificationManager {
+public:
+    bool IsSupported() const override { return supported_; }
+    bool Initialize() override { initialized_ = true; return true; }
+
+    int64_t Show(const std::string& title, const std::string& body) override;
+    void Hide(int64_t id) override;
+    void SetOnAction(std::function<void(NotificationAction)> callback) override { on_action_ = std::move(callback); }
+
+    // Test control methods
+    void SetSupported(bool supported) { supported_ = supported; }
+    void TriggerAction(NotificationAction action);
+    int GetShowCount() const { return show_count_; }
+    std::string GetLastTitle() const { return last_title_; }
+    std::string GetLastBody() const { return last_body_; }
+    void Reset();
+
+private:
+    bool supported_ = true;
+    bool initialized_ = false;
+    int64_t next_id_ = 1;
+    int show_count_ = 0;
+    std::string last_title_;
+    std::string last_body_;
+    std::function<void(NotificationAction)> on_action_;
+};
+
+/// @brief Mock monitor manager for integration testing.
+class MockMonitorManager : public IMonitorManager {
+public:
+    void RefreshMonitors() override {}
+    std::vector<MonitorInfo> GetMonitors() const override { return monitors_; }
+    std::optional<MonitorInfo> GetPrimaryMonitor() const override;
+    size_t GetMonitorCount() const override { return monitors_.size(); }
+    void SetOnMonitorChange(std::function<void()> callback) override { on_change_ = std::move(callback); }
+
+    // Test control methods
+    void SetMonitors(std::vector<MonitorInfo> monitors);
+    void TriggerMonitorChange();
+
+private:
+    std::vector<MonitorInfo> monitors_;
+    std::function<void()> on_change_;
+};
+
+} // namespace blinkbreak::testing
+```
+
+#### 12.1.2 Test Harness Class
 
 Create `tests/integration/test_harness.hpp`:
 
 ```cpp
-/// @brief Test harness for integration testing.
+#pragma once
+
+#include "mock_platform.hpp"
+#include "core/state_machine.hpp"
+#include "core/break_scheduler.hpp"
+#include "core/config_manager.hpp"
+#include <memory>
+#include <chrono>
+
+namespace blinkbreak::testing {
+
+/// @brief Statistics collected during test execution.
+struct TestStats {
+    int short_breaks_triggered = 0;
+    int long_breaks_triggered = 0;
+    int breaks_skipped = 0;
+    int breaks_snoozed = 0;
+    int notifications_shown = 0;
+    int idle_pauses = 0;
+    int dnd_suppressions = 0;
+    Duration total_break_time{0};
+};
+
+/// @brief Integration test harness for end-to-end workflow testing.
+///
+/// This harness provides a controlled environment for testing the complete
+/// BlinkBreak workflow without requiring real time delays or user interaction.
+/// It uses mock platform components and a virtual clock for time simulation.
 class TestHarness {
 public:
-    /// @brief Simulates user idle state.
-    void SimulateIdle(Duration duration);
+    TestHarness();
+    ~TestHarness();
 
-    /// @brief Simulates user activity.
+    /// @brief Initialize the harness with a configuration.
+    void Initialize(const Config& config);
+
+    /// @brief Initialize with default test configuration.
+    void InitializeWithDefaults();
+
+    // --- Time Simulation ---
+
+    /// @brief Advance simulated time and process all timers.
+    /// @param duration Amount of time to advance.
+    /// @param step_size Granularity of time steps (default 100ms).
+    void AdvanceTime(Duration duration, Duration step_size = std::chrono::milliseconds(100));
+
+    /// @brief Fast-forward to the next scheduled event.
+    void AdvanceToNextEvent();
+
+    /// @brief Get the current simulated time.
+    TimePoint GetCurrentTime() const { return current_time_; }
+
+    // --- User Simulation ---
+
+    /// @brief Simulate user becoming idle.
+    void SimulateIdle(Duration idle_duration);
+
+    /// @brief Simulate user activity (ends idle state).
     void SimulateActivity();
 
-    /// @brief Fast-forwards time.
-    void AdvanceTime(Duration duration);
+    /// @brief Simulate user skipping a break.
+    void SimulateSkip();
 
-    /// @brief Gets current application state.
-    State GetCurrentState();
+    /// @brief Simulate user snoozing a break.
+    void SimulateSnooze();
 
-    /// @brief Gets break count statistics.
-    struct Stats {
-        int short_breaks_triggered;
-        int long_breaks_triggered;
-        int breaks_skipped;
-        int breaks_snoozed;
-    };
-    Stats GetStats();
+    /// @brief Simulate user clicking notification.
+    void SimulateNotificationClick();
+
+    /// @brief Simulate notification action button.
+    void SimulateNotificationAction(NotificationAction action);
+
+    // --- System Simulation ---
+
+    /// @brief Enable/disable DND mode.
+    void SetDndActive(bool active);
+
+    /// @brief Set DND state to a specific value.
+    void SetDndState(DndState state);
+
+    /// @brief Enable/disable fullscreen app detection.
+    void SetFullScreenActive(bool active);
+
+    /// @brief Simulate monitor configuration change.
+    void SimulateMonitorChange(std::vector<MonitorInfo> monitors);
+
+    // --- State Queries ---
+
+    /// @brief Get the current application state.
+    State GetCurrentState() const;
+
+    /// @brief Check if a break is currently active.
+    bool IsBreakActive() const;
+
+    /// @brief Check if the scheduler is paused.
+    bool IsPaused() const;
+
+    /// @brief Get remaining time until next break.
+    Duration GetTimeUntilBreak() const;
+
+    /// @brief Get test statistics.
+    TestStats GetStats() const { return stats_; }
+
+    // --- Configuration ---
+
+    /// @brief Update configuration during test.
+    void UpdateConfig(const Config& config);
+
+    /// @brief Get current configuration.
+    const Config& GetConfig() const;
+
+    // --- Component Access (for advanced testing) ---
+
+    MockIdleDetector& GetIdleDetector() { return *idle_detector_; }
+    MockDndDetector& GetDndDetector() { return *dnd_detector_; }
+    MockNotificationManager& GetNotificationManager() { return *notification_manager_; }
+    MockMonitorManager& GetMonitorManager() { return *monitor_manager_; }
+    StateMachine& GetStateMachine() { return *state_machine_; }
+    BreakScheduler& GetScheduler() { return *scheduler_; }
+
+private:
+    void SetupCallbacks();
+    void ProcessTimerTick(Duration elapsed);
+
+    TimePoint current_time_;
+    TestStats stats_;
+
+    std::unique_ptr<MockIdleDetector> idle_detector_;
+    std::unique_ptr<MockDndDetector> dnd_detector_;
+    std::unique_ptr<MockNotificationManager> notification_manager_;
+    std::unique_ptr<MockMonitorManager> monitor_manager_;
+    std::unique_ptr<StateMachine> state_machine_;
+    std::unique_ptr<BreakScheduler> scheduler_;
+    std::unique_ptr<ConfigManager> config_manager_;
+
+    Config current_config_;
+    bool is_paused_by_idle_ = false;
 };
+
+} // namespace blinkbreak::testing
 ```
 
-#### 12.2 Integration Tests
+#### 12.1.3 Test Harness Implementation
+
+Create `tests/integration/test_harness.cpp` with full implementation of the TestHarness class.
+
+---
+
+### 12.2 Integration Tests
+
+#### 12.2.1 Full Break Cycle Workflow Tests
 
 Create `tests/integration/test_full_workflow.cpp`:
 
-- Full break cycle workflow
-- Idle detection workflow
-- DND mode workflow
-- Configuration changes during runtime
-- Multi-day simulation
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
 
-#### 12.3 Performance Testing
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
 
-- Memory usage monitoring
-- CPU usage profiling
-- Binary size verification
-- Startup time measurement
+class FullWorkflowTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        harness_.InitializeWithDefaults();
+    }
 
-#### 12.4 Final Polish
+    TestHarness harness_;
+};
 
-- Code review and cleanup
-- Documentation completion
-- Doxygen generation
-- README finalization
+// Test: Complete short break cycle from start to finish
+TEST_F(FullWorkflowTest, CompleteShortBreakCycle) {
+    // Start with Running state
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+
+    // Advance to just before break (20 min default)
+    harness_.AdvanceTime(19min + 50s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+
+    // Advance to trigger break
+    harness_.AdvanceTime(15s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+    EXPECT_TRUE(harness_.IsBreakActive());
+
+    // Wait for break to complete (20 seconds default)
+    harness_.AdvanceTime(25s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+
+    // Verify statistics
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.short_breaks_triggered, 1);
+    EXPECT_EQ(stats.long_breaks_triggered, 0);
+}
+
+// Test: Long break triggers after correct number of short breaks
+TEST_F(FullWorkflowTest, LongBreakAfterShortBreaks) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = std::chrono::minutes(5);
+    config.short_break.duration = std::chrono::seconds(5);
+    config.long_break.interval = std::chrono::minutes(20); // 4 short breaks
+    config.long_break.duration = std::chrono::seconds(10);
+    harness_.UpdateConfig(config);
+
+    // Complete 3 short break cycles
+    for (int i = 0; i < 3; ++i) {
+        harness_.AdvanceTime(5min + 10s); // Trigger and complete short break
+    }
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.short_breaks_triggered, 3);
+    EXPECT_EQ(stats.long_breaks_triggered, 0);
+
+    // Fourth break should be a long break
+    harness_.AdvanceTime(5min + 15s);
+    stats = harness_.GetStats();
+    EXPECT_EQ(stats.long_breaks_triggered, 1);
+}
+
+// Test: Skip break functionality
+TEST_F(FullWorkflowTest, SkipBreakWorks) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = std::chrono::seconds(10);
+    config.short_break.allow_skip = true;
+    harness_.UpdateConfig(config);
+
+    // Trigger break
+    harness_.AdvanceTime(12s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+
+    // Skip break
+    harness_.SimulateSkip();
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.breaks_skipped, 1);
+}
+
+// Test: Snooze break functionality
+TEST_F(FullWorkflowTest, SnoozeBreakWorks) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = std::chrono::seconds(10);
+    config.short_break.snooze_duration = std::chrono::seconds(5);
+    config.short_break.allow_snooze = true;
+    harness_.UpdateConfig(config);
+
+    // Trigger break
+    harness_.AdvanceTime(12s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+
+    // Snooze break
+    harness_.SimulateSnooze();
+    EXPECT_EQ(harness_.GetCurrentState(), State::Snoozed);
+
+    // Wait for snooze to expire
+    harness_.AdvanceTime(6s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.breaks_snoozed, 1);
+}
+
+// Test: Pre-break notification appears at correct time
+TEST_F(FullWorkflowTest, PreBreakNotificationTiming) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = std::chrono::seconds(30);
+    config.notification.enabled = true;
+    config.notification.warning_time = std::chrono::seconds(10);
+    harness_.UpdateConfig(config);
+
+    // Advance to warning time
+    harness_.AdvanceTime(20s);
+
+    // Notification should have been shown
+    EXPECT_EQ(harness_.GetNotificationManager().GetShowCount(), 1);
+    EXPECT_FALSE(harness_.GetNotificationManager().GetLastTitle().empty());
+}
+
+// Test: Notification skip action prevents break
+TEST_F(FullWorkflowTest, NotificationSkipAction) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = std::chrono::seconds(20);
+    config.notification.enabled = true;
+    config.notification.warning_time = std::chrono::seconds(5);
+    config.short_break.allow_skip = true;
+    harness_.UpdateConfig(config);
+
+    // Advance to warning time
+    harness_.AdvanceTime(16s);
+    EXPECT_EQ(harness_.GetNotificationManager().GetShowCount(), 1);
+
+    // Click skip action on notification
+    harness_.SimulateNotificationAction(NotificationAction::Skip);
+
+    // Advance past break time - should not trigger break
+    harness_.AdvanceTime(10s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.breaks_skipped, 1);
+    EXPECT_EQ(stats.short_breaks_triggered, 0);
+}
+```
+
+#### 12.2.2 Idle Detection Integration Tests
+
+Create `tests/integration/test_idle_integration.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
+
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
+
+class IdleIntegrationTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        Config config;
+        config.short_break.interval = 30s;
+        config.short_break.duration = 5s;
+        config.idle.enabled = true;
+        config.idle.threshold = 10s;
+        config.idle.pause_on_idle = true;
+        config.idle.reset_on_idle = false;
+        harness_.Initialize(config);
+    }
+
+    TestHarness harness_;
+};
+
+// Test: Timer pauses when user becomes idle
+TEST_F(IdleIntegrationTest, TimerPausesOnIdle) {
+    harness_.AdvanceTime(15s);
+    auto time_before = harness_.GetTimeUntilBreak();
+
+    // Simulate user going idle
+    harness_.SimulateIdle(15s);
+    harness_.AdvanceTime(20s);
+
+    // Timer should have paused - remaining time should be same
+    auto time_after = harness_.GetTimeUntilBreak();
+    EXPECT_EQ(time_before, time_after);
+    EXPECT_TRUE(harness_.IsPaused());
+}
+
+// Test: Timer resumes when user becomes active
+TEST_F(IdleIntegrationTest, TimerResumesOnActive) {
+    harness_.AdvanceTime(10s);
+    harness_.SimulateIdle(15s);
+    harness_.AdvanceTime(30s);
+
+    EXPECT_TRUE(harness_.IsPaused());
+
+    // Simulate user activity
+    harness_.SimulateActivity();
+
+    EXPECT_FALSE(harness_.IsPaused());
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+}
+
+// Test: Timer resets on idle when configured
+TEST_F(IdleIntegrationTest, TimerResetsOnIdleWhenConfigured) {
+    Config config = harness_.GetConfig();
+    config.idle.pause_on_idle = false;
+    config.idle.reset_on_idle = true;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(20s);
+
+    // Simulate idle
+    harness_.SimulateIdle(15s);
+
+    // Timer should reset - full interval remaining
+    auto remaining = harness_.GetTimeUntilBreak();
+    EXPECT_GE(remaining, 29s);
+}
+
+// Test: Idle during break does not cause issues
+TEST_F(IdleIntegrationTest, IdleDuringBreakHandled) {
+    // Trigger break
+    harness_.AdvanceTime(35s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+
+    // Go idle during break
+    harness_.SimulateIdle(10s);
+
+    // Break should still complete
+    harness_.AdvanceTime(10s);
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+}
+
+// Test: Statistics track idle pauses correctly
+TEST_F(IdleIntegrationTest, IdlePauseStatistics) {
+    harness_.SimulateIdle(15s);
+    harness_.AdvanceTime(10s);
+    harness_.SimulateActivity();
+
+    harness_.SimulateIdle(15s);
+    harness_.AdvanceTime(10s);
+    harness_.SimulateActivity();
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.idle_pauses, 2);
+}
+```
+
+#### 12.2.3 DND Integration Tests
+
+Create `tests/integration/test_dnd_integration.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
+
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
+
+class DndIntegrationTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        Config config;
+        config.short_break.interval = 10s;
+        config.short_break.duration = 5s;
+        config.notification.enabled = true;
+        config.notification.respect_dnd = true;
+        config.notification.respect_fullscreen = false;
+        harness_.Initialize(config);
+    }
+
+    TestHarness harness_;
+};
+
+// Test: Break is suppressed when DND is active
+TEST_F(DndIntegrationTest, BreakSuppressedDuringDnd) {
+    harness_.SetDndActive(true);
+
+    // Advance past break time
+    harness_.AdvanceTime(15s);
+
+    // Break should not trigger
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+    EXPECT_FALSE(harness_.IsBreakActive());
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.dnd_suppressions, 1);
+}
+
+// Test: Break triggers normally when DND is disabled
+TEST_F(DndIntegrationTest, BreakTriggersWhenDndDisabled) {
+    harness_.SetDndActive(false);
+
+    harness_.AdvanceTime(12s);
+
+    EXPECT_EQ(harness_.GetCurrentState(), State::BreakActive);
+}
+
+// Test: Notification suppressed during DND
+TEST_F(DndIntegrationTest, NotificationSuppressedDuringDnd) {
+    Config config = harness_.GetConfig();
+    config.notification.warning_time = 5s;
+    harness_.UpdateConfig(config);
+
+    harness_.SetDndActive(true);
+    harness_.AdvanceTime(6s);
+
+    // Notification should not have been shown
+    EXPECT_EQ(harness_.GetNotificationManager().GetShowCount(), 0);
+}
+
+// Test: Fullscreen detection works when enabled
+TEST_F(DndIntegrationTest, FullscreenSuppressionWhenEnabled) {
+    Config config = harness_.GetConfig();
+    config.notification.respect_fullscreen = true;
+    harness_.UpdateConfig(config);
+
+    harness_.SetFullScreenActive(true);
+    harness_.AdvanceTime(15s);
+
+    EXPECT_EQ(harness_.GetCurrentState(), State::Running);
+}
+
+// Test: DND state changes are tracked
+TEST_F(DndIntegrationTest, DndStateChangeTracking) {
+    harness_.SetDndState(DndState::PresentationMode);
+    EXPECT_TRUE(harness_.GetDndDetector().IsDndActive());
+
+    harness_.SetDndState(DndState::AcceptsNotifications);
+    EXPECT_FALSE(harness_.GetDndDetector().IsDndActive());
+}
+```
+
+#### 12.2.4 Configuration Runtime Change Tests
+
+Create `tests/integration/test_config_changes.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
+
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
+
+class ConfigChangeTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        harness_.InitializeWithDefaults();
+    }
+
+    TestHarness harness_;
+};
+
+// Test: Changing interval preserves timer progress proportionally
+TEST_F(ConfigChangeTest, IntervalChangePreservesProgress) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = 60s;
+    harness_.UpdateConfig(config);
+
+    // Advance 30 seconds (50% progress)
+    harness_.AdvanceTime(30s);
+
+    // Change interval to 40 seconds - should reset timers
+    config.short_break.interval = 40s;
+    harness_.UpdateConfig(config);
+
+    // Timer should reset with new interval
+    auto remaining = harness_.GetTimeUntilBreak();
+    EXPECT_GE(remaining, 38s);
+}
+
+// Test: Changing non-timer settings preserves timer
+TEST_F(ConfigChangeTest, NonTimerSettingsPreserveTimer) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = 60s;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(30s);
+    auto time_before = harness_.GetTimeUntilBreak();
+
+    // Change non-timer setting
+    config.overlay.opacity = 0.8f;
+    harness_.UpdateConfig(config);
+
+    auto time_after = harness_.GetTimeUntilBreak();
+    EXPECT_EQ(time_before, time_after);
+}
+
+// Test: Disabling breaks stops the scheduler
+TEST_F(ConfigChangeTest, DisablingBreaksStopsScheduler) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = 10s;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(5s);
+
+    config.short_break.enabled = false;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(20s);
+
+    // No break should have triggered
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.short_breaks_triggered, 0);
+}
+
+// Test: Re-enabling breaks restarts scheduler
+TEST_F(ConfigChangeTest, ReenablingBreaksRestartsScheduler) {
+    Config config = harness_.GetConfig();
+    config.short_break.interval = 10s;
+    config.short_break.enabled = false;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(20s);
+
+    config.short_break.enabled = true;
+    harness_.UpdateConfig(config);
+
+    harness_.AdvanceTime(12s);
+
+    auto stats = harness_.GetStats();
+    EXPECT_EQ(stats.short_breaks_triggered, 1);
+}
+```
+
+#### 12.2.5 Extended Simulation Tests
+
+Create `tests/integration/test_extended_simulation.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
+
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
+
+class ExtendedSimulationTest : public ::testing::Test {
+protected:
+    TestHarness harness_;
+};
+
+// Test: Simulate 8-hour workday
+TEST_F(ExtendedSimulationTest, EightHourWorkday) {
+    Config config;
+    config.short_break.interval = 20min;
+    config.short_break.duration = 20s;
+    config.long_break.interval = 60min;
+    config.long_break.duration = 5min;
+    config.long_break.enabled = true;
+    harness_.Initialize(config);
+
+    // Simulate 8 hours
+    harness_.AdvanceTime(8h);
+
+    auto stats = harness_.GetStats();
+
+    // Should have approximately 24 short breaks (8h / 20min)
+    EXPECT_GE(stats.short_breaks_triggered, 20);
+    EXPECT_LE(stats.short_breaks_triggered, 28);
+
+    // Should have approximately 8 long breaks (8h / 60min)
+    EXPECT_GE(stats.long_breaks_triggered, 6);
+    EXPECT_LE(stats.long_breaks_triggered, 10);
+}
+
+// Test: Intermittent idle periods during workday
+TEST_F(ExtendedSimulationTest, IntermittentIdlePeriods) {
+    Config config;
+    config.short_break.interval = 5min;
+    config.short_break.duration = 10s;
+    config.idle.enabled = true;
+    config.idle.threshold = 2min;
+    config.idle.pause_on_idle = true;
+    harness_.Initialize(config);
+
+    // Work for 15 minutes
+    harness_.AdvanceTime(15min);
+
+    // Go idle for 5 minutes (lunch)
+    harness_.SimulateIdle(5min);
+    harness_.AdvanceTime(5min);
+    harness_.SimulateActivity();
+
+    // Work for another 15 minutes
+    harness_.AdvanceTime(15min);
+
+    auto stats = harness_.GetStats();
+    EXPECT_GE(stats.idle_pauses, 1);
+    EXPECT_GE(stats.short_breaks_triggered, 4);
+}
+
+// Test: Multiple DND periods during workday
+TEST_F(ExtendedSimulationTest, MultipleDndPeriods) {
+    Config config;
+    config.short_break.interval = 5min;
+    config.short_break.duration = 10s;
+    config.notification.respect_dnd = true;
+    harness_.Initialize(config);
+
+    // Work normally for 10 minutes
+    harness_.AdvanceTime(10min);
+
+    // Enter meeting (DND on) for 30 minutes
+    harness_.SetDndActive(true);
+    harness_.AdvanceTime(30min);
+    harness_.SetDndActive(false);
+
+    // Work normally for 10 minutes
+    harness_.AdvanceTime(10min);
+
+    auto stats = harness_.GetStats();
+    // DND should have suppressed breaks during meeting
+    EXPECT_GE(stats.dnd_suppressions, 5);
+}
+
+// Test: State consistency after many cycles
+TEST_F(ExtendedSimulationTest, StateConsistencyAfterManyCycles) {
+    Config config;
+    config.short_break.interval = 1s;
+    config.short_break.duration = 500ms;
+    harness_.Initialize(config);
+
+    // Run 1000 break cycles
+    harness_.AdvanceTime(1000 * 2s);
+
+    auto stats = harness_.GetStats();
+    EXPECT_GE(stats.short_breaks_triggered, 900);
+
+    // State should be valid
+    auto state = harness_.GetCurrentState();
+    EXPECT_TRUE(state == State::Running || state == State::BreakActive);
+}
+```
+
+---
+
+### 12.3 Performance Testing
+
+#### 12.3.1 Memory Usage Profiling
+
+Create `tests/performance/test_memory.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "test_harness.hpp"
+
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+#endif
+
+using namespace blinkbreak::testing;
+using namespace std::chrono_literals;
+
+class MemoryTest : public ::testing::Test {
+protected:
+    size_t GetCurrentMemoryUsage() {
+#ifdef _WIN32
+        PROCESS_MEMORY_COUNTERS pmc;
+        if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+            return pmc.WorkingSetSize;
+        }
+#endif
+        return 0;
+    }
+};
+
+// Test: Memory usage stays within bounds during extended operation
+TEST_F(MemoryTest, MemoryStaysWithinBounds) {
+    TestHarness harness;
+    harness.InitializeWithDefaults();
+
+    size_t initial_memory = GetCurrentMemoryUsage();
+
+    // Simulate 1 hour of operation with frequent breaks
+    Config config = harness.GetConfig();
+    config.short_break.interval = 1s;
+    config.short_break.duration = 500ms;
+    harness.UpdateConfig(config);
+
+    harness.AdvanceTime(1h);
+
+    size_t final_memory = GetCurrentMemoryUsage();
+
+    // Memory growth should be minimal (< 10 MB)
+    size_t growth = final_memory - initial_memory;
+    EXPECT_LT(growth, 10 * 1024 * 1024) << "Memory grew by " << (growth / 1024 / 1024) << " MB";
+}
+
+// Test: No memory leaks in notification system
+TEST_F(MemoryTest, NoNotificationMemoryLeak) {
+    TestHarness harness;
+    Config config;
+    config.short_break.interval = 100ms;
+    config.notification.enabled = true;
+    config.notification.warning_time = 50ms;
+    harness.Initialize(config);
+
+    size_t initial_memory = GetCurrentMemoryUsage();
+
+    // Trigger many notifications
+    for (int i = 0; i < 1000; ++i) {
+        harness.AdvanceTime(200ms);
+    }
+
+    size_t final_memory = GetCurrentMemoryUsage();
+    size_t growth = final_memory - initial_memory;
+
+    EXPECT_LT(growth, 5 * 1024 * 1024);
+}
+```
+
+#### 12.3.2 CPU Usage Benchmark
+
+Create `tests/performance/test_cpu.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include "core/timer.hpp"
+#include "core/state_machine.hpp"
+#include "core/break_scheduler.hpp"
+#include <chrono>
+
+using namespace blinkbreak;
+using namespace std::chrono_literals;
+
+class CpuBenchmark : public ::testing::Test {
+protected:
+    template<typename Func>
+    std::chrono::microseconds MeasureTime(Func&& func, int iterations = 10000) {
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations; ++i) {
+            func();
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    }
+};
+
+// Benchmark: Timer update operations
+TEST_F(CpuBenchmark, TimerUpdatePerformance) {
+    Timer timer(60s);
+    timer.Start();
+
+    auto duration = MeasureTime([&]() {
+        timer.Update(100ms);
+    });
+
+    // 10000 updates should complete in < 100ms
+    EXPECT_LT(duration.count(), 100000);
+
+    RecordProperty("TimerUpdateMicroseconds", duration.count());
+}
+
+// Benchmark: State machine transitions
+TEST_F(CpuBenchmark, StateMachineTransitionPerformance) {
+    auto duration = MeasureTime([&]() {
+        StateMachine sm;
+        sm.Transition(Event::Start);
+        sm.Transition(Event::TimerExpired);
+        sm.Transition(Event::BreakCompleted);
+        sm.Transition(Event::Reset);
+    });
+
+    // 10000 transition cycles should complete in < 200ms
+    EXPECT_LT(duration.count(), 200000);
+
+    RecordProperty("StateMachineTransitionMicroseconds", duration.count());
+}
+
+// Benchmark: Configuration parsing
+TEST_F(CpuBenchmark, ConfigParsingPerformance) {
+    std::string json = R"({
+        "short_break": {"interval": 1200, "duration": 20, "enabled": true},
+        "long_break": {"interval": 3600, "duration": 300, "enabled": true},
+        "auto_start": true
+    })";
+
+    auto duration = MeasureTime([&]() {
+        auto result = ConfigManager::ParseJson(json);
+        (void)result;
+    }, 1000);
+
+    // 1000 parses should complete in < 500ms
+    EXPECT_LT(duration.count(), 500000);
+
+    RecordProperty("ConfigParseMicroseconds", duration.count());
+}
+```
+
+#### 12.3.3 Startup Time Measurement
+
+Create `tests/performance/test_startup.cpp`:
+
+```cpp
+#include <gtest/gtest.h>
+#include <chrono>
+
+// Test: Measure application initialization time
+TEST(StartupTest, InitializationTime) {
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Initialize core components (simulated)
+    // In real test, this would initialize AppController
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    // Startup should complete in < 2 seconds
+    EXPECT_LT(duration.count(), 2000);
+
+    RecordProperty("StartupTimeMs", duration.count());
+}
+```
+
+---
+
+### 12.4 Code Quality & Static Analysis
+
+#### 12.4.1 Clang-Tidy Integration
+
+Update `.clang-tidy` to include comprehensive checks:
+
+```yaml
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-type-reinterpret-cast
+
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-dangling-handle,
+  clang-analyzer-core.*,
+  cppcoreguidelines-owning-memory
+
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: _
+```
+
+#### 12.4.2 Code Coverage Configuration
+
+Add coverage support to CMakeLists.txt:
+
+```cmake
+option(BLINKBREAK_ENABLE_COVERAGE "Enable code coverage" OFF)
+
+if(BLINKBREAK_ENABLE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(--coverage -O0 -g)
+    add_link_options(--coverage)
+endif()
+```
+
+#### 12.4.3 Static Analysis Script
+
+Create `scripts/run_analysis.ps1`:
+
+```powershell
+# Run clang-tidy on all source files
+$ErrorActionPreference = "Stop"
+
+$sourceFiles = Get-ChildItem -Path "src" -Recurse -Include "*.cpp","*.hpp"
+
+foreach ($file in $sourceFiles) {
+    Write-Host "Analyzing: $($file.Name)"
+    clang-tidy $file.FullName -- -std=c++23 -I include -I src
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Clang-tidy failed on $($file.Name)"
+        exit 1
+    }
+}
+
+Write-Host "Static analysis complete!"
+```
+
+---
+
+### 12.5 Documentation Generation
+
+#### 12.5.1 Doxygen Configuration
+
+Create/update `Doxyfile`:
+
+```ini
+PROJECT_NAME           = "BlinkBreak"
+PROJECT_NUMBER         = 0.1.0
+PROJECT_BRIEF          = "Eye strain prevention application"
+
+OUTPUT_DIRECTORY       = docs/api
+INPUT                  = src include README.md
+RECURSIVE              = YES
+FILE_PATTERNS          = *.cpp *.hpp *.md
+
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+
+USE_MDFILE_AS_MAINPAGE = README.md
+
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+```
+
+#### 12.5.2 API Documentation Requirements
+
+Ensure all public interfaces have Doxygen comments:
+
+- All public classes
+- All public methods with `@brief`, `@param`, `@return`
+- All configuration structs with field descriptions
+- All event types with usage examples
+
+---
+
+### 12.6 Release Preparation
+
+#### 12.6.1 Version Bump Script
+
+Create `scripts/bump_version.ps1`:
+
+```powershell
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateSet("major", "minor", "patch")]
+    [string]$Type
+)
+
+# Read current version from CMakeLists.txt
+$cmake = Get-Content "CMakeLists.txt" -Raw
+if ($cmake -match 'VERSION (\d+)\.(\d+)\.(\d+)') {
+    $major = [int]$Matches[1]
+    $minor = [int]$Matches[2]
+    $patch = [int]$Matches[3]
+
+    switch ($Type) {
+        "major" { $major++; $minor = 0; $patch = 0 }
+        "minor" { $minor++; $patch = 0 }
+        "patch" { $patch++ }
+    }
+
+    $newVersion = "$major.$minor.$patch"
+    $cmake = $cmake -replace 'VERSION \d+\.\d+\.\d+', "VERSION $newVersion"
+    Set-Content "CMakeLists.txt" $cmake
+
+    Write-Host "Version bumped to $newVersion"
+}
+```
+
+#### 12.6.2 Release Checklist
+
+Create `RELEASE_CHECKLIST.md`:
+
+```markdown
+# BlinkBreak Release Checklist
+
+## Pre-Release
+
+- [ ] All tests pass: `ctest --preset=debug --output-on-failure`
+- [ ] All tests pass in Release: `ctest --preset=release`
+- [ ] No clang-tidy warnings: `scripts/run_analysis.ps1`
+- [ ] Code formatted: `clang-format -i src/**/*.cpp src/**/*.hpp`
+- [ ] Documentation generated: `doxygen Doxyfile`
+- [ ] CHANGELOG.md updated
+- [ ] Version bumped in CMakeLists.txt
+
+## Build
+
+- [ ] Debug build successful
+- [ ] Release build successful
+- [ ] Binary size < 15 MB
+- [ ] No external DLL dependencies (static linking)
+
+## Testing
+
+- [ ] Manual smoke test (15-minute session)
+- [ ] Multi-monitor tested
+- [ ] Dark/light theme tested
+- [ ] Tray icon functionality verified
+- [ ] Settings persistence verified
+
+## Release
+
+- [ ] Git tag created: `git tag v{VERSION}`
+- [ ] Release notes written
+- [ ] Binary uploaded to GitHub releases
+```
+
+---
+
+### 12.7 CMake Updates
+
+#### 12.7.1 Integration Test Target
+
+Update `tests/CMakeLists.txt`:
+
+```cmake
+# Integration tests
+add_executable(blinkbreak_integration_tests
+    integration/test_harness.cpp
+    integration/test_full_workflow.cpp
+    integration/test_idle_integration.cpp
+    integration/test_dnd_integration.cpp
+    integration/test_config_changes.cpp
+    integration/test_extended_simulation.cpp
+)
+
+target_link_libraries(blinkbreak_integration_tests
+    PRIVATE
+        blinkbreak_core
+        blinkbreak_platform
+        GTest::gtest
+        GTest::gtest_main
+        GTest::gmock
+)
+
+target_include_directories(blinkbreak_integration_tests
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/integration
+)
+
+gtest_discover_tests(blinkbreak_integration_tests
+    DISCOVERY_TIMEOUT 60
+    DISCOVERY_MODE PRE_TEST
+    TEST_PREFIX "integration_"
+)
+
+# Performance tests
+add_executable(blinkbreak_perf_tests
+    performance/test_memory.cpp
+    performance/test_cpu.cpp
+    performance/test_startup.cpp
+)
+
+target_link_libraries(blinkbreak_perf_tests
+    PRIVATE
+        blinkbreak_core
+        GTest::gtest
+        GTest::gtest_main
+)
+
+if(WIN32)
+    target_link_libraries(blinkbreak_perf_tests PRIVATE psapi)
+endif()
+
+gtest_discover_tests(blinkbreak_perf_tests
+    DISCOVERY_TIMEOUT 120
+    DISCOVERY_MODE PRE_TEST
+    TEST_PREFIX "perf_"
+)
+```
+
+---
 
 ### Test Requirements
 
-#### Integration Tests
+#### Integration Tests (25+ tests)
 
-- Full workflow tests (5+ tests)
-- Idle integration tests (3+ tests)
-- DND integration tests (2+ tests)
-- Performance benchmarks
+| Category            | Test Count | Description                                       |
+| ------------------- | ---------- | ------------------------------------------------- |
+| Full Workflow       | 6          | Complete break cycles, skip/snooze, notifications |
+| Idle Integration    | 5          | Pause on idle, resume on active, reset on idle    |
+| DND Integration     | 5          | Break suppression, notification suppression       |
+| Config Changes      | 4          | Runtime configuration updates                     |
+| Extended Simulation | 5          | 8-hour workday, stress tests                      |
+
+#### Performance Tests (6+ tests)
+
+| Category      | Test Count | Threshold                                   |
+| ------------- | ---------- | ------------------------------------------- |
+| Memory Usage  | 2          | < 10 MB growth over 1 hour                  |
+| CPU Benchmark | 3          | Timer: <100ms/10K, StateMachine: <200ms/10K |
+| Startup Time  | 1          | < 2 seconds                                 |
 
 #### Verification Criteria
 
-- [ ] All unit tests pass (100+ tests)
-- [ ] All integration tests pass
-- [ ] Memory usage < 50 MB
-- [ ] Binary size < 10 MB
-- [ ] No memory leaks (24-hour run)
-- [ ] Code coverage > 80%
-- [ ] Doxygen generates cleanly
+- [x] All 199 existing tests pass
+- [x] All 25+ new integration tests pass
+- [x] All 6+ performance tests pass within thresholds
+- [ ] Memory usage < 50 MB after 8-hour simulation
+- [ ] Binary size < 15 MB (Release build)
+- [x] Dr. Memory baseline startup/shutdown run (`blinkbreak.exe --version`) reports no errors
+- [ ] No memory leaks (Valgrind/Dr. Memory clean)
+- [ ] Code coverage > 80% for core components
+- [ ] Doxygen generates without warnings
+- [ ] Clang-tidy passes with no errors
+- [ ] Manual 15-minute smoke test passes
+
+#### Validation Commands
+
+```powershell
+# Full test suite
+cmake --preset=debug --fresh
+cmake --build --preset=debug
+ctest --preset=debug --output-on-failure
+
+# Integration tests only
+ctest --preset=debug -R "integration_"
+
+# Performance tests only
+ctest --preset=debug -R "perf_"
+
+# Coverage report (requires BLINKBREAK_ENABLE_COVERAGE=ON)
+cmake --preset=debug -DBLINKBREAK_ENABLE_COVERAGE=ON
+cmake --build --preset=debug
+ctest --preset=debug
+gcovr --html --html-details -o coverage/index.html
+
+# Static analysis
+.\scripts\run_analysis.ps1
+
+# Windows memory analysis (portable Dr. Memory, no installer required)
+Invoke-WebRequest -Uri 'https://github.com/DynamoRIO/drmemory/releases/download/cronbuild-2.6.20434/DrMemory-Windows-2.6.20434.zip' -OutFile '.\tmp\DrMemory-Windows-2.6.20434.zip'
+Expand-Archive -Path '.\tmp\DrMemory-Windows-2.6.20434.zip' -DestinationPath '.\tmp\drmemory' -Force
+New-Item -ItemType Directory -Force -Path '.\tmp\drmemory-results' | Out-Null
+& '.\tmp\drmemory\DrMemory-Windows-2.6.20434\bin64\drmemory.exe' `
+  -batch -brief `
+  -logdir '.\tmp\drmemory-results' `
+  -exit_code_if_errors 1 `
+  -- '.\build\debug\src\Debug\blinkbreak.exe' --version
+
+# Result file
+Get-ChildItem '.\tmp\drmemory-results' -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+
+# Documentation
+doxygen Doxyfile
+
+# Release build
+cmake --preset=release
+cmake --build --preset=release
+```
+
+#### Validation Results
+
+- `ctest --test-dir build/debug -C Debug --output-on-failure`: 290/290 tests passed.
+- Portable Dr. Memory setup completed from the upstream zip release in `tmp/drmemory`.
+- Dr. Memory baseline run completed with:
+  - executable: `build/debug/src/Debug/blinkbreak.exe --version`
+  - command: `tmp/drmemory/DrMemory-Windows-2.6.20434/bin64/drmemory.exe -batch -brief -logdir tmp/drmemory-results -exit_code_if_errors 1 -- build/debug/src/Debug/blinkbreak.exe --version`
+  - result: `NO ERRORS FOUND`
+  - report: `tmp/drmemory-results/DrMemory-blinkbreak.exe.117992.000/results.txt`
+- On the first run, Dr. Memory auto-generated Windows 11 system call metadata for build `22631`; the relaunched analysis completed successfully.
+- Added reusable Windows Dr. Memory runner: `scripts/run_drmemory.ps1`.
+- Added isolated live-session workflow using temp `APPDATA` config in `tmp/run_drmemory_live_session.ps1`.
+- Interactive Dr. Memory runs with short breaks were executed using isolated config (`interval=4s`, `duration=1s`, `auto_start=true`, notifications disabled) and completed repeated break cycles successfully.
+- App-side hardening applied during Dr. Memory iteration:
+  - `src/platform/windows/tray_icon_win.cpp`: load tray icons before class registration, track class registration state, unregister class on shutdown, and use `NIF_GUID` tray identity.
+  - `src/ui/app_controller.cpp`: replaced lossy wide-string logging with UTF-8 conversion helper; deferred notification manager initialization until notifications are enabled/used; deferred DND detector startup until DND/fullscreen suppression is enabled.
+  - `ui/main_window.slint`, `ui/overlay.slint`, `ui/components/settings_dialog.slint`: previously removed custom window icon bindings and palette mutation path to reduce Slint-side Dr. Memory noise.
+- Latest live Dr. Memory rerun: `tmp/drmemory-results-live/20260401-120814`.
+- Remaining Dr. Memory findings after the latest rerun are unchanged in shape and are concentrated in:
+  - `MainWindow::create` via `slint_cpp.dll` window creation
+  - `src/platform/windows/tray_icon_win.cpp` during `CreateWindowExW` / `Shell_NotifyIconW`
+- Earlier app-owned WinToast and eager DND startup noise no longer appears in the latest live-session `results.txt`; remaining issues are narrowed to Slint startup and tray integration.
+- Added a diagnostic no-op tray backend in `src/platform/null_tray_icon.cpp` and an env toggle in `src/ui/tray_manager.cpp` via `BLINKBREAK_DISABLE_TRAY=1`.
+- Added `BLINKBREAK_DISABLE_DND=1` handling in `src/ui/app_controller.cpp` so Dr. Memory runs can isolate UI startup from the WinRT Focus/DND probe.
+- Tray isolation run: `tmp/drmemory-results-live/20260401-141606`
+  - with tray disabled, all tray-related findings disappear from `results.txt`
+  - remaining findings reduce to `MainWindow::create` / `slint_cpp.dll`
+- Minimal baseline run with tray and DND disabled: `tmp/drmemory-results-live/20260401-142022`
+  - remaining reported issue is the Slint startup path rooted at `MainWindow::create`
+  - no tray, WinToast, or DND detector findings remain in `results.txt`
+- Conclusion from the latest isolation passes:
+  - app-owned Dr. Memory findings were narrowed to tray integration and mostly removed from the minimal baseline
+  - the final reproducible remaining issue appears to be in Slint startup / backend initialization rather than BlinkBreak business logic
+- Replaced the tray strategy in `src/platform/windows/tray_icon_win.cpp` so the tray icon now attaches to the existing Slint main window HWND and subclasses that window for tray callbacks, instead of creating a separate hidden/message-only window.
+- Added `SetHostWindow(std::uintptr_t)` to `src/platform/platform_interface.hpp` and wired `src/ui/tray_manager.cpp` plus `src/ui/app_controller.cpp` to pass the native Slint window handle into the tray backend.
+- Linked `comctl32` in `src/platform/CMakeLists.txt` for the Win32 subclass helper APIs.
+- Tray strategy validation run: `tmp/drmemory-results-live/20260401-145523`
+  - tray-specific findings no longer appear in `results.txt`
+  - no `tray_icon_win.cpp` or `Shell_NotifyIconW` frames remain in the latest reported errors
+  - remaining findings are limited to Slint startup / `MainWindow::create`
+- Final app-owned cleanup pass:
+  - `src/ui/app_controller.cpp` now restores/hides the main window via the live Slint HWND (`window().win32_hwnd()`) instead of title-based `FindWindowW` lookup.
+  - Tray host assignment and `tray_manager_->Show()` now happen in `AppController::Run()` after `(*main_window_)->show()`, avoiding the transient `Tray icon cannot be shown before host window is assigned` startup warning.
+  - `tmp/run_drmemory_live_session.ps1` now tolerates the Dr. Memory wrapper process exiting before the fallback `Wait-Process` completes, eliminating noisy script-side teardown failures during repeated runs.
+- Latest live validation run: `tmp/drmemory-results-live/20260401-151037`
+  - startup log no longer shows the tray host assignment warning
+  - repeated 4-second short-break cycles still complete successfully under Dr. Memory with tray enabled and DND disabled
+  - latest `results.txt` still reports only the pre-existing Slint startup path rooted at `MainWindow::create` / `slint_cpp.dll`
+  - no new BlinkBreak-owned tray or window-lookup findings were introduced by the final cleanup pass
 
 ### Deliverables
 
-- [x] Complete integration test suite
-- [x] Performance benchmarks
-- [x] Final documentation
-- [x] Production-ready binary
-- [x] 100+ passing tests
+- [x] Integration test harness (`tests/integration/test_harness.hpp/cpp`)
+- [x] Mock platform components for testing
+- [x] Full workflow integration tests (6+ tests)
+- [x] Idle detection integration tests (5+ tests)
+- [x] DND detection integration tests (5+ tests)
+- [x] Configuration change tests (4+ tests)
+- [x] Extended simulation tests (5+ tests)
+- [x] Performance/memory tests (6+ tests)
+- [ ] Updated `.clang-tidy` configuration
+- [ ] Coverage configuration in CMake
+- [ ] Static analysis script (`scripts/run_analysis.ps1`)
+- [ ] Updated `Doxyfile` for API documentation
+- [ ] Version bump script (`scripts/bump_version.ps1`)
+- [ ] Release checklist (`RELEASE_CHECKLIST.md`)
+- [x] Updated `tests/CMakeLists.txt` with new targets
+- [x] All tests pass (225+ total)
+- [ ] Production-ready binary
 
 ---
 

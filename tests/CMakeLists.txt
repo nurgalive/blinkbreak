@@ -1,4 +1,4 @@
-# Test executable
+# Test executable - Unit tests
 if(NOT TARGET blinkbreak_tests)
     add_executable(blinkbreak_tests
         unit/test_timer.cpp
@@ -30,4 +30,75 @@ if(NOT TARGET blinkbreak_tests)
     gtest_discover_tests(blinkbreak_tests DISCOVERY_TIMEOUT 30 DISCOVERY_MODE PRE_TEST)
 endif()
 
+# Integration tests
+if(NOT TARGET blinkbreak_integration_tests)
+    add_executable(blinkbreak_integration_tests
+        integration/test_harness.cpp
+        integration/test_full_workflow.cpp
+        integration/test_idle_integration.cpp
+        integration/test_dnd_integration.cpp
+        integration/test_config_changes.cpp
+        integration/test_extended_simulation.cpp
+    )
+
+    target_link_libraries(blinkbreak_integration_tests
+        PRIVATE
+            blinkbreak_core
+            blinkbreak_platform
+            GTest::gtest
+            GTest::gtest_main
+            GTest::gmock
+    )
+
+    target_include_directories(blinkbreak_integration_tests
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/src
+            ${PROJECT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/integration
+    )
+
+    # Register integration tests with CTest
+    gtest_discover_tests(blinkbreak_integration_tests
+        DISCOVERY_TIMEOUT 60
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "integration_"
+    )
+endif()
+
+# Performance tests
+if(NOT TARGET blinkbreak_performance_tests)
+    add_executable(blinkbreak_performance_tests
+        performance/test_memory.cpp
+        performance/test_cpu.cpp
+        performance/test_startup.cpp
+    )
+
+    target_link_libraries(blinkbreak_performance_tests
+        PRIVATE
+            blinkbreak_core
+            blinkbreak_platform
+            GTest::gtest
+            GTest::gtest_main
+    )
+
+    target_include_directories(blinkbreak_performance_tests
+        PRIVATE
+            ${PROJECT_SOURCE_DIR}/src
+            ${PROJECT_SOURCE_DIR}/include
+    )
+
+    # Link Windows-specific libraries for memory profiling
+    if(WIN32)
+        target_link_libraries(blinkbreak_performance_tests PRIVATE psapi)
+    endif()
+
+    # Register performance tests with CTest
+    gtest_discover_tests(blinkbreak_performance_tests
+        DISCOVERY_TIMEOUT 120
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "perf_"
+    )
+endif()
+
+# UI tests subdirectory
 add_subdirectory(ui)

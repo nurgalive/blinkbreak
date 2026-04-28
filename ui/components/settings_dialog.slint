@@ -82,9 +82,7 @@ export component SettingsDialog inherits Window {
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
     out property <bool> dark-mode-enabled: !root.theme-follow-system;
-    private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (
-        root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light
-    );
+    private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light);
 
     in-out property <ColorScheme> palette-color-scheme <=> Palette.color-scheme;
     init => {

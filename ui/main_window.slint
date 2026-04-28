@@ -125,9 +125,7 @@ export component MainWindow inherits Window {
     in property <bool> theme-dark-mode: false;
     out property <string> start-button-label: root.is-running ? "Pause" : "Start";
     out property <bool> dark-theme-enabled: !root.theme-follow-system;
-    private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (
-        root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light
-    );
+    private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light);
 
     in-out property <ColorScheme> palette-color-scheme <=> Palette.color-scheme;
     init => {

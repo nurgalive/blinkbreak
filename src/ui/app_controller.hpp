@@ -225,6 +225,8 @@ private:
     int long_break_count_;
     int short_skipped_count_;
     int long_skipped_count_;
+    int short_idle_skipped_count_;
+    int long_idle_skipped_count_;
     bool skip_in_progress_;
     std::optional<BreakType> pending_notification_break_;
     std::optional<platform::NotificationAction> pending_notification_action_;
@@ -235,6 +237,7 @@ private:
     bool is_paused_by_idle_;
     bool show_idle_timer_;
     std::string idle_time_;
+    bool reset_on_idle_triggered_;  ///< Tracks if reset on idle was triggered this session.
 };
 
 }  // namespace blinkbreak

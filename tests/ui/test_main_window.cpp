@@ -83,6 +83,8 @@ TEST(MainWindowUiTest, PropertiesRoundTrip) {
     window->set_long_break_count(1);
     window->set_short_skipped_count(1);
     window->set_long_skipped_count(3);
+    window->set_short_idle_skipped_count(2);
+    window->set_long_idle_skipped_count(4);
 
     EXPECT_EQ(ToStdString(window->get_time_until_short()), "05:00");
     EXPECT_EQ(ToStdString(window->get_time_until_long()), "25:00");
@@ -94,6 +96,8 @@ TEST(MainWindowUiTest, PropertiesRoundTrip) {
     EXPECT_EQ(window->get_long_break_count(), 1);
     EXPECT_EQ(window->get_short_skipped_count(), 1);
     EXPECT_EQ(window->get_long_skipped_count(), 3);
+    EXPECT_EQ(window->get_short_idle_skipped_count(), 2);
+    EXPECT_EQ(window->get_long_idle_skipped_count(), 4);
 }
 
 /// @test Verifies theme properties round-trip on the main window.

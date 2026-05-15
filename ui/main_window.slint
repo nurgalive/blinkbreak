@@ -15,6 +15,8 @@ component TimerDisplay inherits Rectangle {
     in property <int> long_break_count: 0;
     in property <int> short_skipped_count: 0;
     in property <int> long_skipped_count: 0;
+    in property <int> short_idle_skipped_count: 0;
+    in property <int> long_idle_skipped_count: 0;
     in property <string> tracked_time: "00:00";
     width: 160px;
     height: 160px;
@@ -88,6 +90,34 @@ component TimerDisplay inherits Rectangle {
                 color: Palette.foreground;
             }
         }
+
+        Text {
+            text: "Idle Skipped";
+            font-size: 11px;
+            font-weight: 600;
+            horizontal-alignment: center;
+            color: Palette.foreground;
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            spacing: 12px;
+            Text {
+                text: "Short: " + root.short_idle_skipped_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: Palette.foreground;
+            }
+
+            Text {
+                text: "Long: " + root.long_idle_skipped_count;
+                font-size: 10px;
+                font-weight: 500;
+                horizontal-alignment: center;
+                color: Palette.foreground;
+            }
+        }
     }
 }
 
@@ -118,6 +148,8 @@ export component MainWindow inherits Window {
     in property <int> long-break-count: 0;
     in property <int> short-skipped-count: 0;
     in property <int> long-skipped-count: 0;
+    in property <int> short-idle-skipped-count: 0;
+    in property <int> long-idle-skipped-count: 0;
     in property <bool> is-running: false;
     in property <bool> show-idle-timer: false;
     in property <string> idle-time: "00:00";
@@ -157,6 +189,8 @@ export component MainWindow inherits Window {
                 long_break_count: root.long-break-count;
                 short_skipped_count: root.short-skipped-count;
                 long_skipped_count: root.long-skipped-count;
+                short_idle_skipped_count: root.short-idle-skipped-count;
+                long_idle_skipped_count: root.long-idle-skipped-count;
             }
         }
 

@@ -65,11 +65,12 @@ TEST_F(IdleIntegrationTest, TimerResumesOnActive) {
     EXPECT_EQ(harness_.GetCurrentState(), State::kRunning);
 }
 
-// Test: Timer resets on idle when configured
+// Test: Timer resets after reset-on-idle threshold when configured
 TEST_F(IdleIntegrationTest, TimerResetsOnIdleWhenConfigured) {
     AppConfig config = harness_.GetConfig();
     config.idle.pause_on_idle = false;
     config.idle.reset_on_idle = true;
+    config.idle.reset_threshold = Duration(12);  // 12 seconds
     harness_.UpdateConfig(config);
 
     // Advance halfway through the interval
@@ -78,26 +79,9 @@ TEST_F(IdleIntegrationTest, TimerResetsOnIdleWhenConfigured) {
     ASSERT_TRUE(time_before.has_value());
     EXPECT_LT(time_before->count(), 15);  // Should have progressed
 
-    // Simulate idle - should reset timers
-    // Note: Reset() in BreakScheduler stops the scheduler (is_running_ = false)
-    // so GetTimeUntilNextBreak() will return nullopt until restarted
+    // Simulate idle long enough to cross reset threshold
     harness_.SimulateIdle(15s);
-
-    // Simulate activity to come back
-    harness_.SimulateActivity();
-
-    // The key behavior we're testing is that the reset happened.
-    // Since Reset() stops the scheduler, we verify that on next start,
-    // the timer would be at full interval. For now, verify the stats
-    // show the idle detection worked (pause count tracked separately).
-    auto stats = harness_.GetStats();
-    // With reset_on_idle (not pause_on_idle), idle_pauses is not incremented
-    // because the harness only increments idle_pauses when pause_on_idle is true.
-    // The important thing is that Reset() was called, which we verified above.
-
-    // Since scheduler is stopped after reset, let's restart it manually
-    // to verify the timer starts fresh
-    harness_.GetScheduler().Start();
+    harness_.AdvanceTime(1s);
 
     auto time_after = harness_.GetTimeUntilBreak();
     ASSERT_TRUE(time_after.has_value());

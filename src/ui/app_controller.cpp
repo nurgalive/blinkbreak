@@ -87,6 +87,8 @@ AppController::AppController()
       long_break_count_(0),
       short_skipped_count_(0),
       long_skipped_count_(0),
+      short_idle_skipped_count_(0),
+      long_idle_skipped_count_(0),
       tracked_duration_(Duration::zero()),
       tracked_duration_ms_(DurationMs::zero()),
       skip_in_progress_(false),
@@ -97,7 +99,8 @@ AppController::AppController()
       is_running_(false),
       is_paused_by_idle_(false),
       show_idle_timer_(false),
-      idle_time_("00:00") {
+      idle_time_("00:00"),
+      reset_on_idle_triggered_(false) {
     spdlog::debug("AppController created");
 }
 
@@ -359,6 +362,8 @@ bool AppController::Initialize() {
     long_break_count_ = 0;
     short_skipped_count_ = 0;
     long_skipped_count_ = 0;
+    short_idle_skipped_count_ = 0;
+    long_idle_skipped_count_ = 0;
     skip_in_progress_ = false;
     is_running_ = false;
     show_idle_timer_ = config_.idle.show_timer;
@@ -401,6 +406,8 @@ bool AppController::Initialize() {
     ui->set_long_break_count(long_break_count_);
     ui->set_short_skipped_count(short_skipped_count_);
     ui->set_long_skipped_count(long_skipped_count_);
+    ui->set_short_idle_skipped_count(short_idle_skipped_count_);
+    ui->set_long_idle_skipped_count(long_idle_skipped_count_);
     ui->set_is_running(is_running_);
     ui->set_show_idle_timer(show_idle_timer_);
     ui->set_idle_time(slint::SharedString(idle_time_));
@@ -693,6 +700,8 @@ void AppController::OnOpenSettings() {
             const auto long_duration_text = ToStdString(dialog->get_long_duration_seconds());
             const auto snooze_duration_text = ToStdString(dialog->get_snooze_duration_minutes());
             const auto idle_threshold_text = ToStdString(dialog->get_idle_threshold_minutes());
+            const auto reset_threshold_text =
+                ToStdString(dialog->get_idle_reset_threshold_minutes());
             const auto notification_warning_text =
                 ToStdString(dialog->get_notification_warning_seconds());
 
@@ -702,11 +711,13 @@ void AppController::OnOpenSettings() {
             const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
             const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
             const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
+            const auto reset_threshold_minutes =
+                ParsePositiveInt(reset_threshold_text);
             const auto notification_warning_seconds = ParsePositiveInt(notification_warning_text);
 
             if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
                 !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes ||
-                !notification_warning_seconds) {
+                !reset_threshold_minutes || !notification_warning_seconds) {
                 dialog->set_validation_error(
                     slint::SharedString("All fields must be positive integers."));
                 return;
@@ -742,8 +753,9 @@ void AppController::OnOpenSettings() {
             updated.idle.enabled = dialog->get_idle_enabled();
             updated.idle.threshold = Duration(*idle_threshold_minutes * 60);
             updated.idle.pause_on_idle = dialog->get_idle_pause_on_idle();
-            updated.idle.reset_on_idle = dialog->get_idle_reset_on_idle();
             updated.idle.show_timer = dialog->get_idle_show_timer();
+            updated.idle.reset_on_idle = dialog->get_idle_reset_on_idle();
+            updated.idle.reset_threshold = Duration(*reset_threshold_minutes * 60);
 
             auto errors = config_manager_->Validate(updated);
             if (!errors.empty()) {
@@ -919,8 +931,10 @@ void AppController::OnOpenSettings() {
     dialog->set_idle_threshold_minutes(slint::SharedString(
         std::to_string(static_cast<int>(snapshot.idle.threshold.count() / 60))));
     dialog->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
-    dialog->set_idle_reset_on_idle(snapshot.idle.reset_on_idle);
     dialog->set_idle_show_timer(snapshot.idle.show_timer);
+    dialog->set_idle_reset_on_idle(snapshot.idle.reset_on_idle);
+    dialog->set_idle_reset_threshold_minutes(slint::SharedString(
+        std::to_string(static_cast<int>(snapshot.idle.reset_threshold.count() / 60))));
 
     dialog->set_validation_error(slint::SharedString(""));
     ApplyThemeToSettingsDialog();
@@ -1061,6 +1075,8 @@ void AppController::UpdateUI() {
     int long_break_count = 0;
     int short_skipped_count = 0;
     int long_skipped_count = 0;
+    int short_idle_skipped_count = 0;
+    int long_idle_skipped_count = 0;
     bool is_running = false;
     bool show_idle_timer = false;
     std::string idle_time = "00:00";
@@ -1108,6 +1124,44 @@ void AppController::UpdateUI() {
             }
         }
 
+        // Get current idle time for display and reset-on-idle check
+        std::chrono::milliseconds curr_idle{0};
+        if (idle_detector_ && idle_detector_->IsRunning()) {
+            curr_idle = idle_detector_->GetIdleTime();
+        }
+
+        if (config_.idle.show_timer) {
+            auto idle_sec = std::chrono::duration_cast<std::chrono::seconds>(curr_idle);
+            idle_time_ = FormatDuration(std::chrono::duration_cast<Duration>(idle_sec));
+            show_idle_timer_ = true;
+        } else {
+            show_idle_timer_ = false;
+        }
+
+        // Check for reset breaks on idle
+        if (config_.idle.reset_on_idle && !reset_on_idle_triggered_) {
+            auto reset_threshold_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                config_.idle.reset_threshold);
+            if (curr_idle >= reset_threshold_ms) {
+                spdlog::info("Reset breaks on idle triggered: idle time {}s >= threshold {}s",
+                             std::chrono::duration_cast<std::chrono::seconds>(curr_idle).count(),
+                             config_.idle.reset_threshold.count());
+                reset_on_idle_triggered_ = true;
+
+                // Reset timers (treat as if both breaks were taken)
+                // Note: scheduler_mutex_ is already held by the outer scope
+                scheduler_->ResetTimers();
+
+                // Increment break counts (user "took" both breaks during idle reset)
+                ++short_break_count_;
+                ++long_break_count_;
+                ++short_idle_skipped_count_;
+                ++long_idle_skipped_count_;
+
+                status_text_ = "Idle - Breaks reset";
+            }
+        }
+
         time_until_short = time_until_short_;
         time_until_long = time_until_long_;
         tracked_time = tracked_time_;
@@ -1118,19 +1172,9 @@ void AppController::UpdateUI() {
         long_break_count = long_break_count_;
         short_skipped_count = short_skipped_count_;
         long_skipped_count = long_skipped_count_;
+        short_idle_skipped_count = short_idle_skipped_count_;
+        long_idle_skipped_count = long_idle_skipped_count_;
         is_running = is_running_;
-
-        if (config_.idle.show_timer) {
-            std::chrono::milliseconds curr_idle{0};
-            if (idle_detector_ && idle_detector_->IsRunning()) {
-                curr_idle = idle_detector_->GetIdleTime();
-            }
-            auto idle_sec = std::chrono::duration_cast<std::chrono::seconds>(curr_idle);
-            idle_time_ = FormatDuration(std::chrono::duration_cast<Duration>(idle_sec));
-            show_idle_timer_ = true;
-        } else {
-            show_idle_timer_ = false;
-        }
 
         show_idle_timer = show_idle_timer_;
         idle_time = idle_time_;
@@ -1155,10 +1199,11 @@ void AppController::UpdateUI() {
     }
 
     auto ui_weak = *main_window_weak_;
-    slint::invoke_from_event_loop([ui_weak, time_until_short, time_until_long, tracked_time,
-                                   status_text, short_progress, long_progress, short_break_count,
-                                   long_break_count, short_skipped_count, long_skipped_count,
-                                   is_running, show_idle_timer, idle_time]() mutable {
+    slint::invoke_from_event_loop(
+        [ui_weak, time_until_short, time_until_long, tracked_time, status_text, short_progress,
+         long_progress, short_break_count, long_break_count, short_skipped_count,
+         long_skipped_count, short_idle_skipped_count, long_idle_skipped_count, is_running,
+         show_idle_timer, idle_time]() mutable {
         if (auto ui_handle = ui_weak.lock()) {
             (*ui_handle)->set_time_until_short(slint::SharedString(time_until_short));
             (*ui_handle)->set_time_until_long(slint::SharedString(time_until_long));
@@ -1170,6 +1215,8 @@ void AppController::UpdateUI() {
             (*ui_handle)->set_long_break_count(long_break_count);
             (*ui_handle)->set_short_skipped_count(short_skipped_count);
             (*ui_handle)->set_long_skipped_count(long_skipped_count);
+            (*ui_handle)->set_short_idle_skipped_count(short_idle_skipped_count);
+            (*ui_handle)->set_long_idle_skipped_count(long_idle_skipped_count);
             (*ui_handle)->set_is_running(is_running);
             (*ui_handle)->set_show_idle_timer(show_idle_timer);
             (*ui_handle)->set_idle_time(slint::SharedString(idle_time));
@@ -1195,34 +1242,17 @@ std::string AppController::FormatDuration(Duration duration) {
 
 void AppController::OnUserIdle() {
     bool should_pause = false;
-    bool should_reset = false;
     {
         std::lock_guard lock(mutex_);
         should_pause = config_.idle.pause_on_idle;
-        should_reset = config_.idle.reset_on_idle;
     }
 
-    spdlog::info("AppController: User became idle (config: pause_on_idle={}, reset_on_idle={})",
-                 should_pause, should_reset);
+    spdlog::info("AppController: User became idle (config: pause_on_idle={})",
+                 should_pause);
 
     const auto current_state = GetCurrentStateSnapshot();
 
-    if (should_reset && current_state == State::kRunning) {
-        // Reset timers on idle if configured
-        spdlog::info("Resetting timers due to idle");
-        {
-            std::lock_guard scheduler_lock(scheduler_mutex_);
-            scheduler_->Reset();
-        }
-        state_machine_->ProcessEvent(UserIdleEvent{});
-        {
-            std::lock_guard lock(mutex_);
-            status_text_ = "Idle - Timers reset";
-            is_paused_by_idle_ = true;
-            short_progress_ = 0.0f;
-            long_progress_ = 0.0f;
-        }
-    } else if (should_pause && current_state == State::kRunning) {
+    if (should_pause && current_state == State::kRunning) {
         // Pause on idle
         spdlog::info("Pausing due to idle");
         auto result = state_machine_->ProcessEvent(UserIdleEvent{});
@@ -1245,12 +1275,17 @@ void AppController::OnUserIdle() {
 
 void AppController::OnUserActive() {
     bool was_paused_by_idle = false;
+    bool was_reset_on_idle = false;
     {
         std::lock_guard lock(mutex_);
         was_paused_by_idle = is_paused_by_idle_;
+        was_reset_on_idle = reset_on_idle_triggered_;
+        reset_on_idle_triggered_ = false;
     }
 
-    spdlog::info("AppController: User became active (was_paused_by_idle={})", was_paused_by_idle);
+    spdlog::info(
+        "AppController: User became active (was_paused_by_idle={}, was_reset_on_idle={})",
+        was_paused_by_idle, was_reset_on_idle);
 
     const auto current_state = GetCurrentStateSnapshot();
 

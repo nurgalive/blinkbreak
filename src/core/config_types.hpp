@@ -25,8 +25,13 @@ struct IdleConfig {
     bool enabled = true;                    ///< Whether idle detection is enabled.
     Duration threshold = Duration::zero();  ///< Time before considered idle.
     bool pause_on_idle = true;              ///< Pause timer when idle.
-    bool reset_on_idle = false;             ///< Reset timer when idle.
     bool show_timer = false;                ///< Show idle timer in UI.
+
+    /// @brief Reset breaks on idle settings.
+    /// When enabled, after the user is idle for reset_threshold duration,
+    /// both short and long break timers will be reset (as if the user took both breaks).
+    bool reset_on_idle = true;                 ///< Enable resetting breaks after idle threshold.
+    Duration reset_threshold = Duration(1200); ///< 20 minutes default.
 };
 
 /// @brief Configuration for notifications.
@@ -79,7 +84,9 @@ struct glz::meta<blinkbreak::IdleConfig> {
     using T = blinkbreak::IdleConfig;
     static constexpr auto value = glz::object(
         "enabled", &T::enabled, "threshold_seconds", &T::threshold, "pause_on_idle",
-        &T::pause_on_idle, "reset_on_idle", &T::reset_on_idle, "show_timer", &T::show_timer);
+        &T::pause_on_idle, "show_timer", &T::show_timer,
+        "reset_on_idle", &T::reset_on_idle,
+        "reset_threshold_seconds", &T::reset_threshold);
 };
 
 template <>

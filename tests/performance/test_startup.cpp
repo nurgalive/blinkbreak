@@ -109,7 +109,8 @@ TEST_F(StartupTest, ConfigurationLoading) {
             "enabled": true,
             "threshold_seconds": 300,
             "pause_on_idle": true,
-            "reset_on_idle": false,
+            "reset_on_idle": true,
+            "reset_threshold_seconds": 1200,
             "show_timer": false
         },
         "notification": {

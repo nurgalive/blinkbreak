@@ -77,8 +77,12 @@ export component SettingsDialog inherits Window {
     in-out property <bool> idle-enabled: true;
     in-out property <string> idle-threshold-minutes: "3";
     in-out property <bool> idle-pause-on-idle: true;
-    in-out property <bool> idle-reset-on-idle: false;
     in-out property <bool> idle-show-timer: false;
+
+    // Reset breaks on idle settings
+    in-out property <bool> idle-reset-on-idle: true;
+    in-out property <string> idle-reset-threshold-minutes: "20";
+
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
     out property <bool> dark-mode-enabled: !root.theme-follow-system;
@@ -350,7 +354,24 @@ export component SettingsDialog inherits Window {
                     alignment: start;
 
                     Text {
-                        text: "Reset on idle";
+                        text: "Show idle timer";
+                        width: 140px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.idle-show-timer;
+                    }
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Reset breaks on idle";
                         width: 140px;
                         vertical-alignment: center;
                         font-size: 12px;
@@ -362,21 +383,10 @@ export component SettingsDialog inherits Window {
                     }
                 }
 
-                HorizontalBox {
-                    spacing: 8px;
-                    alignment: start;
-
-                    Text {
-                        text: "Show idle timer";
-                        width: 140px;
-                        vertical-alignment: center;
-                        font-size: 12px;
-                        color: Palette.foreground;
-                    }
-
-                    Switch {
-                        checked <=> root.idle-show-timer;
-                    }
+                NumberFieldRow {
+                    label: "Reset breaks on idle threshold";
+                    unit: "minutes";
+                    value <=> root.idle-reset-threshold-minutes;
                 }
 
                 if root.validation-error != "": Text {

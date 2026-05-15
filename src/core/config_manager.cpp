@@ -92,6 +92,19 @@ std::vector<ConfigError> ConfigManager::Validate(const AppConfig& config) const 
             {.message = "Idle threshold must be positive when enabled", .field = "idle.threshold"});
     }
 
+    if (config.idle.reset_on_idle &&
+        config.idle.reset_threshold <= Duration::zero()) {
+        errors.push_back({.message = "Reset breaks on idle threshold must be positive when enabled",
+                          .field = "idle.reset_threshold"});
+    }
+
+    if (config.idle.reset_on_idle && config.idle.enabled &&
+        config.idle.reset_threshold <= config.idle.threshold) {
+        errors.push_back(
+            {.message = "Reset breaks on idle threshold should be greater than idle threshold",
+             .field = "idle.reset_threshold"});
+    }
+
     if (config.notification.enabled && config.notification.warning_time < Duration::zero()) {
         errors.push_back(
             {.message = "Warning time cannot be negative", .field = "notification.warning_time"});
@@ -138,8 +151,9 @@ AppConfig ConfigManager::GetDefault() {
     config.idle.enabled = true;
     config.idle.threshold = Duration(180);
     config.idle.pause_on_idle = true;
-    config.idle.reset_on_idle = false;
     config.idle.show_timer = false;
+    config.idle.reset_on_idle = true;
+    config.idle.reset_threshold = Duration(1200);  // 20 minutes
 
     config.notification.enabled = true;
     config.notification.warning_time = Duration(30);

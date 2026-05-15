@@ -1393,6 +1393,71 @@ Migrate the configuration system from RapidJSON to Glaze for improved performanc
 
 ---
 
+#### 9D. Reset Breaks on Idle
+
+### Goal (9D)
+
+Rename and consolidate idle reset behavior so the extended-idle reset becomes the only reset-on-idle mechanism. The "Reset breaks on idle" toggle now controls a threshold-based reset of both short and long timers (default 20 minutes).
+
+### Prerequisites (9D)
+
+- Stage 9C completed successfully.
+
+### Implementation Steps (9D)
+
+**Configuration Changes:**
+
+- Removed the legacy immediate reset-on-idle path.
+- Reused `reset_on_idle` as the "Reset breaks on idle" toggle (extended-idle behavior).
+- Added `reset_threshold` (`reset_threshold_seconds` in JSON, default 1200s/20 minutes).
+- Updated validation to require `reset_threshold` > `threshold` when enabled.
+- Updated `default_config.json`.
+
+**UI Changes:**
+
+- Removed the extended idle controls.
+- Added "Reset breaks on idle" toggle and "Reset breaks on idle threshold" (minutes) field.
+
+**AppController Integration:**
+
+- Renamed `extended_idle_reset_triggered_` to `reset_on_idle_triggered_`.
+- Uses `reset_on_idle` + `reset_threshold` to reset both break timers after extended idle.
+- Clears the reset-on-idle flag on activity.
+
+### Test Requirements (9D)
+
+**Unit Tests (updated in `test_config_manager.cpp`):**
+
+1. `ResetOnIdleDefaults`
+2. `ValidateDetectsResetOnIdleThresholdTooSmall`
+3. `ValidateAcceptsValidResetOnIdleThreshold`
+4. `ValidateSkipsResetOnIdleWhenDisabled`
+5. `ParseJsonReadsResetOnIdleConfig`
+6. `ToJsonRoundtripPreservesResetOnIdleValues`
+
+**UI Tests (updated in `test_settings_dialog.cpp`):**
+
+1. `IdleDetectionDefaults`
+2. `IdleDetectionRoundTrip`
+
+### Verification Criteria (9D)
+
+- [x] `cmake --preset=debug`
+- [x] `cmake --build --preset=debug -- -m:1`
+- [x] `ctest --preset=debug --output-on-failure` (27 perf tests)
+- [x] `build/debug/src/Debug/blinkbreak.exe --version`
+- [ ] Unit/UI/Integration tests registered with CTest (current build only discovers perf tests; unit/ui/integration executables report 0 tests)
+
+### Deliverables (9D)
+
+- [x] Single reset-on-idle path using extended-idle behavior
+- [x] `IdleConfig.reset_threshold` with JSON key `reset_threshold_seconds`
+- [x] Settings dialog renamed to "Reset breaks on idle" with threshold field
+- [x] AppController updated reset-on-idle logic
+- [x] Tests updated for new config/UI properties
+
+---
+
 ## Stage 10: Notifications
 
 ### Goal

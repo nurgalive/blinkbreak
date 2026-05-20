@@ -274,6 +274,7 @@ TEST_F(IdleDetectorWinTest, CallbacksCanBeSet) {
 
     // Start and immediately stop - callbacks should not fire
     // because we haven't reached idle threshold
+    detector_->SetIdleThreshold(24h);
     detector_->Start();
     std::this_thread::sleep_for(100ms);
     detector_->Stop();

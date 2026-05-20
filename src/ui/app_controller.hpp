@@ -145,6 +145,9 @@ private:
     /// @brief Updates UI bindings (called from timer thread).
     void UpdateUI();
 
+    /// @brief Shows the main window from the Slint event loop.
+    void ShowMainWindow();
+
     /// @brief Handles user idle event from idle detector.
     void OnUserIdle();
 
@@ -178,14 +181,7 @@ private:
     [[nodiscard]] std::pair<platform::DndState, bool> EvaluateDndSuppression(
         bool respect_dnd, bool respect_fullscreen);
 
-#ifdef _WIN32
-    /// @brief Gets the native HWND for the main Slint window when available.
-    /// @return Native window handle or nullptr.
-    [[nodiscard]] void* GetNativeMainWindowHandle() const;
 
-    /// @brief Restores the native main window and refreshes its software buffer.
-    void RestoreNativeMainWindow();
-#endif
 
     /// @brief Formats duration as MM:SS string.
     /// @param duration The duration to format.

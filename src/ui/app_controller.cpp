@@ -12,9 +12,7 @@
 #include <spdlog/spdlog.h>
 #include <thread>
 
-#ifdef _WIN32
-    #include <windows.h>
-#endif
+
 
 #include "main_window.h"
 #include "platform/platform_interface.hpp"
@@ -57,25 +55,7 @@ void ApplyThemeProperties(const slint::ComponentHandle<T>& component, const Them
     component->set_theme_dark_mode(theme.dark_mode);
 }
 
-#ifdef _WIN32
-void NudgeWindowSize(HWND hwnd) {
-    if (!hwnd) {
-        return;
-    }
 
-    RECT rect{};
-    if (!GetWindowRect(hwnd, &rect)) {
-        return;
-    }
-
-    const int width = rect.right - rect.left;
-    const int height = rect.bottom - rect.top;
-    SetWindowPos(hwnd, nullptr, 0, 0, width + 1, height, SWP_NOMOVE | SWP_NOZORDER);
-    slint::Timer::single_shot(std::chrono::milliseconds(50), [hwnd, width, height]() {
-        SetWindowPos(hwnd, nullptr, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER);
-    });
-}
-#endif
 
 }  // namespace
 
@@ -123,25 +103,7 @@ AppController::~AppController() {
     spdlog::debug("AppController destroyed");
 }
 
-#ifdef _WIN32
-void* AppController::GetNativeMainWindowHandle() const {
-    if (!main_window_) {
-        return nullptr;
-    }
-    return (*main_window_)->window().win32_hwnd();
-}
 
-void AppController::RestoreNativeMainWindow() {
-    auto* hwnd = static_cast<HWND>(GetNativeMainWindowHandle());
-    if (!hwnd) {
-        return;
-    }
-
-    ShowWindow(hwnd, SW_SHOW);
-    SetForegroundWindow(hwnd);
-    NudgeWindowSize(hwnd);
-}
-#endif
 
 bool AppController::Initialize() {
     spdlog::info("Initializing AppController");
@@ -378,22 +340,10 @@ bool AppController::Initialize() {
     ui->on_settings_clicked([this] { OnOpenSettings(); });
 
     // Handle window close - hide to tray instead of minimizing/quitting.
-    // We use Win32 ShowWindow(SW_HIDE) instead of Slint hide() because the
-    // software renderer loses its rendering buffer across Slint hide/show
-    // cycles, causing a blank white window on restore.
+    // Use Slint's hide path so the renderer can repaint correctly on restore.
     ui->window().on_close_requested([this]() {
         spdlog::debug("Window close requested - hiding to tray");
-#ifdef _WIN32
-        auto* hwnd = static_cast<HWND>(GetNativeMainWindowHandle());
-        if (hwnd) {
-            ShowWindow(hwnd, SW_HIDE);
-        }
-#else
-        if (main_window_) {
-            (*main_window_)->hide();
-        }
-#endif
-        return slint::CloseRequestResponse::KeepWindowShown;
+        return slint::CloseRequestResponse::HideWindow;
     });
 
     ui->set_time_until_short(slint::SharedString(time_until_short_));
@@ -422,17 +372,7 @@ bool AppController::Initialize() {
         .on_show_window =
             [this]() {
                 spdlog::debug("Tray: Show window");
-#ifdef _WIN32
-                RestoreNativeMainWindow();
-#else
-                if (main_window_) {
-                    (*main_window_)->show();
-                    (*main_window_)->window().set_minimized(false);
-                }
-#endif
-                if (main_window_) {
-                    (*main_window_)->window().request_redraw();
-                }
+                ShowMainWindow();
             },
         .on_start_pause =
             [this]() {
@@ -503,7 +443,7 @@ int AppController::Run() {
                 if (!tray_manager_ || !main_window_) {
                     return;
                 }
-                const HWND hwnd = (*main_window_)->window().win32_hwnd();
+                const auto hwnd = (*main_window_)->window().win32_hwnd();
                 spdlog::debug("Attempting to assign tray host window (attempt {}) hwnd={}", attempt,
                               reinterpret_cast<std::uintptr_t>(hwnd));
                 if (hwnd) {
@@ -548,6 +488,28 @@ int AppController::Run() {
     }
 
     return 0;
+}
+
+void AppController::ShowMainWindow() {
+    if (!main_window_weak_) {
+        return;
+    }
+
+    auto ui_weak = *main_window_weak_;
+    slint::invoke_from_event_loop([ui_weak]() mutable {
+        if (auto ui = ui_weak.lock()) {
+            (*ui)->show();
+            (*ui)->window().set_minimized(false);
+            (*ui)->window().request_redraw();
+
+            slint::Timer::single_shot(std::chrono::milliseconds(50),
+                                      [ui_weak]() mutable {
+                                          if (auto ui_retry = ui_weak.lock()) {
+                                              (*ui_retry)->window().request_redraw();
+                                          }
+                                      });
+        }
+    });
 }
 
 void AppController::OnStart() {
@@ -1056,7 +1018,7 @@ void AppController::TimerThreadFunc() {
                 tracked_time_ = FormatDuration(tracked_duration_);
             }
         }
-        UpdateUI();
+        slint::invoke_from_event_loop([this]() { UpdateUI(); });
 
         std::this_thread::sleep_for(kTickInterval);
     }
@@ -1194,34 +1156,26 @@ void AppController::UpdateUI() {
         }
     }
 
-    if (!main_window_weak_) {
+    if (!main_window_) {
         return;
     }
 
-    auto ui_weak = *main_window_weak_;
-    slint::invoke_from_event_loop(
-        [ui_weak, time_until_short, time_until_long, tracked_time, status_text, short_progress,
-         long_progress, short_break_count, long_break_count, short_skipped_count,
-         long_skipped_count, short_idle_skipped_count, long_idle_skipped_count, is_running,
-         show_idle_timer, idle_time]() mutable {
-        if (auto ui_handle = ui_weak.lock()) {
-            (*ui_handle)->set_time_until_short(slint::SharedString(time_until_short));
-            (*ui_handle)->set_time_until_long(slint::SharedString(time_until_long));
-            (*ui_handle)->set_tracked_time(slint::SharedString(tracked_time));
-            (*ui_handle)->set_status_text(slint::SharedString(status_text));
-            (*ui_handle)->set_short_progress(short_progress);
-            (*ui_handle)->set_long_progress(long_progress);
-            (*ui_handle)->set_short_break_count(short_break_count);
-            (*ui_handle)->set_long_break_count(long_break_count);
-            (*ui_handle)->set_short_skipped_count(short_skipped_count);
-            (*ui_handle)->set_long_skipped_count(long_skipped_count);
-            (*ui_handle)->set_short_idle_skipped_count(short_idle_skipped_count);
-            (*ui_handle)->set_long_idle_skipped_count(long_idle_skipped_count);
-            (*ui_handle)->set_is_running(is_running);
-            (*ui_handle)->set_show_idle_timer(show_idle_timer);
-            (*ui_handle)->set_idle_time(slint::SharedString(idle_time));
-        }
-    });
+    auto& ui = *main_window_;
+    ui->set_time_until_short(slint::SharedString(time_until_short));
+    ui->set_time_until_long(slint::SharedString(time_until_long));
+    ui->set_tracked_time(slint::SharedString(tracked_time));
+    ui->set_status_text(slint::SharedString(status_text));
+    ui->set_short_progress(short_progress);
+    ui->set_long_progress(long_progress);
+    ui->set_short_break_count(short_break_count);
+    ui->set_long_break_count(long_break_count);
+    ui->set_short_skipped_count(short_skipped_count);
+    ui->set_long_skipped_count(long_skipped_count);
+    ui->set_short_idle_skipped_count(short_idle_skipped_count);
+    ui->set_long_idle_skipped_count(long_idle_skipped_count);
+    ui->set_is_running(is_running);
+    ui->set_show_idle_timer(show_idle_timer);
+    ui->set_idle_time(slint::SharedString(idle_time));
 }
 
 std::string AppController::FormatDuration(Duration duration) {
@@ -1314,17 +1268,7 @@ void AppController::OnNotificationAction(platform::NotificationAction action) {
     spdlog::info("Notification action: {}", static_cast<int>(action));
 
     if (action == platform::NotificationAction::Clicked) {
-#ifdef _WIN32
-        RestoreNativeMainWindow();
-#else
-        if (main_window_) {
-            (*main_window_)->show();
-            (*main_window_)->window().set_minimized(false);
-        }
-#endif
-        if (main_window_) {
-            (*main_window_)->window().request_redraw();
-        }
+        ShowMainWindow();
     }
 
     bool handled_immediately = false;

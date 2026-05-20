@@ -25,7 +25,8 @@ int main(int argc, char* argv[]) {
     // For windows keep winit-software
 #ifdef _WIN32
     if (std::getenv("SLINT_BACKEND") == nullptr) {
-        _putenv_s("SLINT_BACKEND", "winit-software");
+        _putenv_s("SLINT_BACKEND", "winit-femtovg-wgpu");
+        // _putenv_s("SLINT_BACKEND", "winit-software");  // this backend produces the rendering issues
     }
 #else
     ::setenv("SLINT_BACKEND", "winit-software", 0);

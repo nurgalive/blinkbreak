@@ -1,4 +1,38 @@
 ---
+# ==============================================================================
+# BlinkBreak .clang-tidy Configuration
+# ==============================================================================
+# This configuration enforces strict modern C++23 guidelines, performance
+# practices, and readability rules.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Checks Configuration
+# ------------------------------------------------------------------------------
+# -*: Disable all default checks to explicitly opt-in to what we want.
+# bugprone-*: Catch common bug patterns (e.g., use after move, dangling handles).
+# clang-analyzer-*: Enable clang's static analyzer for deep code path analysis.
+# cppcoreguidelines-*: Enforce C++ Core Guidelines (memory safety, modern paradigms).
+# google-*: Enforce Google C++ Style Guide conventions.
+# misc-*: Miscellaneous checks (e.g., redundant expressions, unused parameters).
+# modernize-*: Modernize code to use the latest C++ features (up to C++23).
+# performance-*: Optimize for performance (e.g., move semantics, avoiding copies).
+# readability-*: Improve code readability, naming, and structure.
+# concurrency-*: Catch concurrency bugs (e.g., race conditions, thread safety).
+# portability-*: Catch portability issues across different platforms/compilers.
+#
+# Exclusions (starting with -):
+# -modernize-use-trailing-return-type: We use standard return types for normal functions.
+# -readability-identifier-length: Short names (like 'i', 'x', 'y') are fine for loop counters.
+# -cppcoreguidelines-avoid-magic-numbers: Magic numbers are often used in UI/math logic.
+# -readability-magic-numbers: Same as above.
+# -google-readability-todo: We don't require the strict TODO(username) format.
+# -cppcoreguidelines-pro-bounds-pointer-arithmetic: We might need pointer arithmetic in platform codes.
+# -cppcoreguidelines-pro-bounds-array-to-pointer-decay: Allowed for C APIs (e.g. Win32).
+# -cppcoreguidelines-pro-type-reinterpret-cast: Reinterpret casts are sometimes needed in Win32 layer.
+# -cppcoreguidelines-pro-type-vararg: Standard variadic functions are sometimes necessary.
+# -modernize-use-nodiscard: Often noisy on simple getters or standard functions.
+# ------------------------------------------------------------------------------
 Checks: >
   -*,
   bugprone-*,
@@ -9,16 +43,46 @@ Checks: >
   modernize-*,
   performance-*,
   readability-*,
+  concurrency-*,
+  portability-*,
   -modernize-use-trailing-return-type,
   -readability-identifier-length,
   -cppcoreguidelines-avoid-magic-numbers,
   -readability-magic-numbers,
-  -google-readability-todo
+  -google-readability-todo,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-vararg,
+  -modernize-use-nodiscard
 
-WarningsAsErrors: ''
+# ------------------------------------------------------------------------------
+# Treat Warnings as Errors
+# ------------------------------------------------------------------------------
+# Treat specific critical bugprone and memory-related warnings as compilation errors.
+# ------------------------------------------------------------------------------
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  bugprone-dangling-handle,
+  clang-analyzer-core.*,
+  cppcoreguidelines-owning-memory
+
+# Check all headers
 HeaderFilterRegex: '.*'
 FormatStyle: file
 
+# ------------------------------------------------------------------------------
+# Check Options
+# ------------------------------------------------------------------------------
+# readability-identifier-naming:
+#   Enforces specific naming conventions across the project to maintain consistency.
+#   - Classes, Structs, Enums: CamelCase
+#   - Functions: CamelCase
+#   - Variables: lower_case
+#   - Private members: lower_case_
+#   - Constants/Enum Constants: kCamelCase
+#   - Namespaces: lower_case
+# ------------------------------------------------------------------------------
 CheckOptions:
   - key: readability-identifier-naming.ClassCase
     value: CamelCase

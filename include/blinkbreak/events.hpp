@@ -4,48 +4,69 @@
 #ifndef BLINKBREAK_EVENTS_HPP
 #define BLINKBREAK_EVENTS_HPP
 
-#include <blinkbreak/types.hpp>
-
 #include <variant>
 
-namespace blinkbreak {
+#include <blinkbreak/types.hpp>
+
+namespace blinkbreak
+{
 
 /// @brief Event triggered when the start action is requested.
-struct StartEvent {};
+struct StartEvent
+{
+};
 
 /// @brief Event triggered when the pause action is requested.
-struct PauseEvent {};
+struct PauseEvent
+{
+};
 
 /// @brief Event triggered when the resume action is requested.
-struct ResumeEvent {};
+struct ResumeEvent
+{
+};
 
 /// @brief Event triggered when the reset action is requested.
-struct ResetEvent {};
+struct ResetEvent
+{
+};
 
 /// @brief Event triggered when a break timer expires.
-struct TimerExpiredEvent {
-    BreakType break_type;  ///< Type of break that expired.
+struct TimerExpiredEvent
+{
+  BreakType break_type;  ///< Type of break that expired.
 };
 
 /// @brief Event triggered when a break is completed.
-struct BreakCompletedEvent {};
+struct BreakCompletedEvent
+{
+};
 
 /// @brief Event triggered when a break is skipped.
-struct SkipEvent {};
+struct SkipEvent
+{
+};
 
 /// @brief Event triggered when a break is snoozed.
-struct SnoozeEvent {
-    Duration duration;  ///< Duration to snooze.
+struct SnoozeEvent
+{
+  Duration duration;  ///< Duration to snooze.
 };
 
 /// @brief Event triggered when snooze timer expires.
-struct SnoozeExpiredEvent {};
+struct SnoozeExpiredEvent
+{
+};
 
 /// @brief Event triggered when user becomes idle.
-struct UserIdleEvent {};
+struct UserIdleEvent
+{
+};
 
 /// @brief Event triggered when user becomes active.
-struct UserActiveEvent {};
+struct UserActiveEvent
+{
+};
 
 /// @brief Variant type holding all possible events.
 using Event = std::variant<StartEvent, PauseEvent, ResumeEvent, ResetEvent, TimerExpiredEvent,

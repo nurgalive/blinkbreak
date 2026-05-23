@@ -5,39 +5,42 @@
 
 #include "core/break_scheduler.hpp"
 
-
-namespace blinkbreak {
-namespace {
+namespace blinkbreak
+{
+namespace
+{
 
 using namespace std::chrono_literals;
 
 /// @brief Test fixture for BreakScheduler tests.
-class BreakSchedulerTest : public ::testing::Test {
+class BreakSchedulerTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
-        short_config_.enabled = true;
-        short_config_.interval = 10s;
-        short_config_.duration = 2s;
-        short_config_.messages = {"Short break!"};
-        short_config_.rotate_messages = true;
+  void SetUp() override
+  {
+    short_config_.enabled = true;
+    short_config_.interval = 10s;
+    short_config_.duration = 2s;
+    short_config_.messages = {"Short break!"};
+    short_config_.rotate_messages = true;
 
-        long_config_.enabled = true;
-        long_config_.interval = 60s;
-        long_config_.duration = 5s;
-        long_config_.messages = {"Long break!"};
-        long_config_.rotate_messages = true;
+    long_config_.enabled = true;
+    long_config_.interval = 60s;
+    long_config_.duration = 5s;
+    long_config_.messages = {"Long break!"};
+    long_config_.rotate_messages = true;
 
-        overlay_config_.allow_skip = true;
-        overlay_config_.allow_snooze = true;
-        overlay_config_.snooze_duration = 5s;
+    overlay_config_.allow_skip = true;
+    overlay_config_.allow_snooze = true;
+    overlay_config_.snooze_duration = 5s;
 
-        scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
-    }
+    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+  }
 
-    BreakConfig short_config_;
-    BreakConfig long_config_;
-    OverlayConfig overlay_config_;
-    std::unique_ptr<BreakScheduler> scheduler_;
+  BreakConfig short_config_;
+  BreakConfig long_config_;
+  OverlayConfig overlay_config_;
+  std::unique_ptr<BreakScheduler> scheduler_;
 };
 
 // ============================================================================
@@ -45,15 +48,17 @@ protected:
 // ============================================================================
 
 /// @test Scheduler starts in not running state.
-TEST_F(BreakSchedulerTest, StartsNotRunning) {
-    EXPECT_FALSE(scheduler_->IsRunning());
-    EXPECT_FALSE(scheduler_->IsBreakActive());
+TEST_F(BreakSchedulerTest, StartsNotRunning)
+{
+  EXPECT_FALSE(scheduler_->IsRunning());
+  EXPECT_FALSE(scheduler_->IsBreakActive());
 }
 
 /// @test Start sets running state.
-TEST_F(BreakSchedulerTest, StartSetsRunning) {
-    scheduler_->Start();
-    EXPECT_TRUE(scheduler_->IsRunning());
+TEST_F(BreakSchedulerTest, StartSetsRunning)
+{
+  scheduler_->Start();
+  EXPECT_TRUE(scheduler_->IsRunning());
 }
 
 // ============================================================================
@@ -61,50 +66,54 @@ TEST_F(BreakSchedulerTest, StartSetsRunning) {
 // ============================================================================
 
 /// @test GetTimeUntilNextBreak returns correct time.
-TEST_F(BreakSchedulerTest, GetTimeUntilNextBreakReturnsCorrectTime) {
-    scheduler_->Start();
-    auto time = scheduler_->GetTimeUntilNextBreak();
+TEST_F(BreakSchedulerTest, GetTimeUntilNextBreakReturnsCorrectTime)
+{
+  scheduler_->Start();
+  auto time = scheduler_->GetTimeUntilNextBreak();
 
-    ASSERT_TRUE(time.has_value());
-    EXPECT_EQ(*time, 10s);  // Short break interval
+  ASSERT_TRUE(time.has_value());
+  EXPECT_EQ(*time, 10s);  // Short break interval
 }
 
 /// @test Timer counts down on Update.
-TEST_F(BreakSchedulerTest, TimerCountsDownOnUpdate) {
-    scheduler_->Start();
-    scheduler_->Update(5s);
+TEST_F(BreakSchedulerTest, TimerCountsDownOnUpdate)
+{
+  scheduler_->Start();
+  scheduler_->Update(5s);
 
-    auto time = scheduler_->GetTimeUntilNextBreak();
-    ASSERT_TRUE(time.has_value());
-    EXPECT_EQ(*time, 5s);
+  auto time = scheduler_->GetTimeUntilNextBreak();
+  ASSERT_TRUE(time.has_value());
+  EXPECT_EQ(*time, 5s);
 }
 
 /// @test Break triggers when timer expires.
-TEST_F(BreakSchedulerTest, BreakTriggersWhenTimerExpires) {
-    bool break_started = false;
-    scheduler_->SetOnBreakStart([&break_started](const BreakInfo&) { break_started = true; });
+TEST_F(BreakSchedulerTest, BreakTriggersWhenTimerExpires)
+{
+  bool break_started = false;
+  scheduler_->SetOnBreakStart([&break_started](const BreakInfo&) { break_started = true; });
 
-    scheduler_->Start();
-    scheduler_->Update(10s);
+  scheduler_->Start();
+  scheduler_->Update(10s);
 
-    EXPECT_TRUE(break_started);
-    EXPECT_TRUE(scheduler_->IsBreakActive());
+  EXPECT_TRUE(break_started);
+  EXPECT_TRUE(scheduler_->IsBreakActive());
 }
 
 /// @test Break remaining time is available while active.
 /// @details Ensures GetTimeUntilBreakEnds reports the active break countdown.
-TEST_F(BreakSchedulerTest, BreakRemainingTimeAvailableDuringActiveBreak) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger short break
+TEST_F(BreakSchedulerTest, BreakRemainingTimeAvailableDuringActiveBreak)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger short break
 
-    auto remaining = scheduler_->GetTimeUntilBreakEnds();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 2s);
+  auto remaining = scheduler_->GetTimeUntilBreakEnds();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 2s);
 
-    scheduler_->Update(1s);
-    remaining = scheduler_->GetTimeUntilBreakEnds();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 1s);
+  scheduler_->Update(1s);
+  remaining = scheduler_->GetTimeUntilBreakEnds();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 1s);
 }
 
 // ============================================================================
@@ -112,89 +121,95 @@ TEST_F(BreakSchedulerTest, BreakRemainingTimeAvailableDuringActiveBreak) {
 // ============================================================================
 
 /// @test GetNextBreakType returns short break first.
-TEST_F(BreakSchedulerTest, GetNextBreakTypeReturnsShortFirst) {
-    scheduler_->Start();
-    EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kShort);
+TEST_F(BreakSchedulerTest, GetNextBreakTypeReturnsShortFirst)
+{
+  scheduler_->Start();
+  EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kShort);
 }
 
 /// @test When timers align, long break should be selected.
-TEST_F(BreakSchedulerTest, GetNextBreakTypePrefersLongOnTie) {
-    short_config_.interval = 10s;
-    long_config_.interval = 10s;
-    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, GetNextBreakTypePrefersLongOnTie)
+{
+  short_config_.interval = 10s;
+  long_config_.interval = 10s;
+  scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
 
-    scheduler_->Start();
-    EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kLong);
+  scheduler_->Start();
+  EXPECT_EQ(scheduler_->GetNextBreakType(), BreakType::kLong);
 }
 
 /// @test When timers expire together, long break should trigger.
-TEST_F(BreakSchedulerTest, LongBreakTriggersWhenTimersAlign) {
-    short_config_.interval = 10s;
-    long_config_.interval = 10s;
-    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, LongBreakTriggersWhenTimersAlign)
+{
+  short_config_.interval = 10s;
+  long_config_.interval = 10s;
+  scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
 
-    BreakType triggered_type = BreakType::kShort;
-    scheduler_->SetOnBreakStart(
-        [&triggered_type](const BreakInfo& info) { triggered_type = info.type; });
+  BreakType triggered_type = BreakType::kShort;
+  scheduler_->SetOnBreakStart([&triggered_type](const BreakInfo& info)
+                              { triggered_type = info.type; });
 
-    scheduler_->Start();
-    scheduler_->Update(10s);
+  scheduler_->Start();
+  scheduler_->Update(10s);
 
-    EXPECT_EQ(triggered_type, BreakType::kLong);
-    EXPECT_TRUE(scheduler_->IsBreakActive());
+  EXPECT_EQ(triggered_type, BreakType::kLong);
+  EXPECT_TRUE(scheduler_->IsBreakActive());
 }
 
 /// @test Long break triggers at correct interval.
-TEST_F(BreakSchedulerTest, LongBreakTriggersAtCorrectInterval) {
-    short_config_.enabled = false;
-    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, LongBreakTriggersAtCorrectInterval)
+{
+  short_config_.enabled = false;
+  scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
 
-    BreakType triggered_type = BreakType::kShort;
-    scheduler_->SetOnBreakStart(
-        [&triggered_type](const BreakInfo& info) { triggered_type = info.type; });
+  BreakType triggered_type = BreakType::kShort;
+  scheduler_->SetOnBreakStart([&triggered_type](const BreakInfo& info)
+                              { triggered_type = info.type; });
 
-    scheduler_->Start();
-    scheduler_->Update(60s);
+  scheduler_->Start();
+  scheduler_->Update(60s);
 
-    EXPECT_EQ(triggered_type, BreakType::kLong);
+  EXPECT_EQ(triggered_type, BreakType::kLong);
 }
 
 /// @test Short break completion does not reset long timer progress.
-TEST_F(BreakSchedulerTest, ShortBreakDoesNotResetLongTimer) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger short break
+TEST_F(BreakSchedulerTest, ShortBreakDoesNotResetLongTimer)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger short break
 
-    EXPECT_TRUE(scheduler_->IsBreakActive());
+  EXPECT_TRUE(scheduler_->IsBreakActive());
 
-    scheduler_->Update(2s);  // Complete short break duration
+  scheduler_->Update(2s);  // Complete short break duration
 
-    auto long_time = scheduler_->GetTimeUntilLongBreak();
-    ASSERT_TRUE(long_time.has_value());
-    EXPECT_EQ(*long_time, 50s);
+  auto long_time = scheduler_->GetTimeUntilLongBreak();
+  ASSERT_TRUE(long_time.has_value());
+  EXPECT_EQ(*long_time, 50s);
 }
 
 /// @test Long break triggers even with periodic short breaks.
-TEST_F(BreakSchedulerTest, LongBreakTriggersWithShortBreaksActive) {
-    long_config_.interval = 25s;
-    long_config_.duration = 5s;
-    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, LongBreakTriggersWithShortBreaksActive)
+{
+  long_config_.interval = 25s;
+  long_config_.duration = 5s;
+  scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
 
-    BreakType triggered_type = BreakType::kShort;
-    scheduler_->SetOnBreakStart(
-        [&triggered_type](const BreakInfo& info) { triggered_type = info.type; });
+  BreakType triggered_type = BreakType::kShort;
+  scheduler_->SetOnBreakStart([&triggered_type](const BreakInfo& info)
+                              { triggered_type = info.type; });
 
-    scheduler_->Start();
+  scheduler_->Start();
 
-    scheduler_->Update(10s);  // Short break at t=10
-    scheduler_->Update(2s);   // Complete short break
+  scheduler_->Update(10s);  // Short break at t=10
+  scheduler_->Update(2s);   // Complete short break
 
-    scheduler_->Update(10s);  // Short break at t=20
-    scheduler_->Update(2s);   // Complete short break
+  scheduler_->Update(10s);  // Short break at t=20
+  scheduler_->Update(2s);   // Complete short break
 
-    scheduler_->Update(5s);  // Long break at t=25
+  scheduler_->Update(5s);  // Long break at t=25
 
-    EXPECT_EQ(triggered_type, BreakType::kLong);
-    EXPECT_TRUE(scheduler_->IsBreakActive());
+  EXPECT_EQ(triggered_type, BreakType::kLong);
+  EXPECT_TRUE(scheduler_->IsBreakActive());
 }
 
 // ============================================================================
@@ -202,27 +217,29 @@ TEST_F(BreakSchedulerTest, LongBreakTriggersWithShortBreaksActive) {
 // ============================================================================
 
 /// @test Pause stops timer.
-TEST_F(BreakSchedulerTest, PauseStopsTimer) {
-    scheduler_->Start();
-    scheduler_->Update(5s);
-    scheduler_->Pause();
-    scheduler_->Update(5s);
+TEST_F(BreakSchedulerTest, PauseStopsTimer)
+{
+  scheduler_->Start();
+  scheduler_->Update(5s);
+  scheduler_->Pause();
+  scheduler_->Update(5s);
 
-    EXPECT_FALSE(scheduler_->IsRunning());
-    auto time = scheduler_->GetTimeUntilNextBreak();
-    EXPECT_FALSE(time.has_value());
+  EXPECT_FALSE(scheduler_->IsRunning());
+  auto time = scheduler_->GetTimeUntilNextBreak();
+  EXPECT_FALSE(time.has_value());
 }
 
 /// @test Resume continues timer.
-TEST_F(BreakSchedulerTest, ResumeContinuesTimer) {
-    scheduler_->Start();
-    scheduler_->Update(5s);
-    scheduler_->Pause();
-    scheduler_->Resume();
+TEST_F(BreakSchedulerTest, ResumeContinuesTimer)
+{
+  scheduler_->Start();
+  scheduler_->Update(5s);
+  scheduler_->Pause();
+  scheduler_->Resume();
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto time = scheduler_->GetTimeUntilNextBreak();
-    EXPECT_EQ(*time, 5s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto time = scheduler_->GetTimeUntilNextBreak();
+  EXPECT_EQ(*time, 5s);
 }
 
 // ============================================================================
@@ -230,49 +247,53 @@ TEST_F(BreakSchedulerTest, ResumeContinuesTimer) {
 // ============================================================================
 
 /// @test SkipBreak ends active break.
-TEST_F(BreakSchedulerTest, SkipBreakEndsActiveBreak) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger break
+TEST_F(BreakSchedulerTest, SkipBreakEndsActiveBreak)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger break
 
-    EXPECT_TRUE(scheduler_->IsBreakActive());
-    scheduler_->SkipBreak();
-    EXPECT_FALSE(scheduler_->IsBreakActive());
+  EXPECT_TRUE(scheduler_->IsBreakActive());
+  scheduler_->SkipBreak();
+  EXPECT_FALSE(scheduler_->IsBreakActive());
 }
 
 /// @test SnoozeBreak delays break.
-TEST_F(BreakSchedulerTest, SnoozeBreakDelaysBreak) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger break
+TEST_F(BreakSchedulerTest, SnoozeBreakDelaysBreak)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger break
 
-    scheduler_->SnoozeBreak();
-    EXPECT_FALSE(scheduler_->IsBreakActive());
+  scheduler_->SnoozeBreak();
+  EXPECT_FALSE(scheduler_->IsBreakActive());
 }
 
 /// @test Snooze extends both short and long timers.
-TEST_F(BreakSchedulerTest, SnoozeExtendsTimers) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger short break
+TEST_F(BreakSchedulerTest, SnoozeExtendsTimers)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger short break
 
-    scheduler_->SnoozeBreak(5s);
+  scheduler_->SnoozeBreak(5s);
 
-    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
-    auto long_remaining = scheduler_->GetTimeUntilLongBreak();
+  auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+  auto long_remaining = scheduler_->GetTimeUntilLongBreak();
 
-    ASSERT_TRUE(short_remaining.has_value());
-    ASSERT_TRUE(long_remaining.has_value());
-    EXPECT_EQ(*short_remaining, 5s);
-    EXPECT_EQ(*long_remaining, 55s);
+  ASSERT_TRUE(short_remaining.has_value());
+  ASSERT_TRUE(long_remaining.has_value());
+  EXPECT_EQ(*short_remaining, 5s);
+  EXPECT_EQ(*long_remaining, 55s);
 }
 
 /// @test Snooze updates interval totals for progress calculations.
-TEST_F(BreakSchedulerTest, SnoozeUpdatesIntervalTotals) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // Trigger short break
+TEST_F(BreakSchedulerTest, SnoozeUpdatesIntervalTotals)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // Trigger short break
 
-    scheduler_->SnoozeBreak(5s);
+  scheduler_->SnoozeBreak(5s);
 
-    EXPECT_EQ(scheduler_->GetShortIntervalTotal(), 15s);
-    EXPECT_EQ(scheduler_->GetLongIntervalTotal(), 65s);
+  EXPECT_EQ(scheduler_->GetShortIntervalTotal(), 15s);
+  EXPECT_EQ(scheduler_->GetLongIntervalTotal(), 65s);
 }
 
 // ============================================================================
@@ -280,30 +301,32 @@ TEST_F(BreakSchedulerTest, SnoozeUpdatesIntervalTotals) {
 // ============================================================================
 
 /// @test BreakInfo contains correct data.
-TEST_F(BreakSchedulerTest, BreakInfoContainsCorrectData) {
-    BreakInfo received_info{};
-    scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
+TEST_F(BreakSchedulerTest, BreakInfoContainsCorrectData)
+{
+  BreakInfo received_info{};
+  scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
 
-    scheduler_->Start();
-    scheduler_->Update(10s);
+  scheduler_->Start();
+  scheduler_->Update(10s);
 
-    EXPECT_EQ(received_info.type, BreakType::kShort);
-    EXPECT_EQ(received_info.duration, 2s);
-    EXPECT_EQ(received_info.message, "Short break!");
-    EXPECT_TRUE(received_info.can_skip);
-    EXPECT_TRUE(received_info.can_snooze);
+  EXPECT_EQ(received_info.type, BreakType::kShort);
+  EXPECT_EQ(received_info.duration, 2s);
+  EXPECT_EQ(received_info.message, "Short break!");
+  EXPECT_TRUE(received_info.can_skip);
+  EXPECT_TRUE(received_info.can_snooze);
 }
 
 /// @test Warning callback fires at correct time.
-TEST_F(BreakSchedulerTest, WarningCallbackFiresAtCorrectTime) {
-    bool warning_received = false;
-    scheduler_->SetOnWarning([&warning_received](BreakType, Duration) { warning_received = true; },
-                             3s);
+TEST_F(BreakSchedulerTest, WarningCallbackFiresAtCorrectTime)
+{
+  bool warning_received = false;
+  scheduler_->SetOnWarning([&warning_received](BreakType, Duration) { warning_received = true; },
+                           3s);
 
-    scheduler_->Start();
-    scheduler_->Update(7s);  // 3s remaining
+  scheduler_->Start();
+  scheduler_->Update(7s);  // 3s remaining
 
-    EXPECT_TRUE(warning_received);
+  EXPECT_TRUE(warning_received);
 }
 
 // ============================================================================
@@ -311,13 +334,14 @@ TEST_F(BreakSchedulerTest, WarningCallbackFiresAtCorrectTime) {
 // ============================================================================
 
 /// @test Reset stops scheduler and resets timers.
-TEST_F(BreakSchedulerTest, ResetStopsAndResetsTimers) {
-    scheduler_->Start();
-    scheduler_->Update(5s);
-    scheduler_->Reset();
+TEST_F(BreakSchedulerTest, ResetStopsAndResetsTimers)
+{
+  scheduler_->Start();
+  scheduler_->Update(5s);
+  scheduler_->Reset();
 
-    EXPECT_FALSE(scheduler_->IsRunning());
-    EXPECT_FALSE(scheduler_->IsBreakActive());
+  EXPECT_FALSE(scheduler_->IsRunning());
+  EXPECT_FALSE(scheduler_->IsBreakActive());
 }
 
 // ============================================================================
@@ -325,224 +349,236 @@ TEST_F(BreakSchedulerTest, ResetStopsAndResetsTimers) {
 // ============================================================================
 
 /// @test UpdateConfig changes messages.
-TEST_F(BreakSchedulerTest, UpdateConfigChangesMessages) {
-    short_config_.messages = {"New message!"};
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, UpdateConfigChangesMessages)
+{
+  short_config_.messages = {"New message!"};
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    BreakInfo received_info{};
-    scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
+  BreakInfo received_info{};
+  scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
 
-    scheduler_->Start();
-    scheduler_->Update(10s);
+  scheduler_->Start();
+  scheduler_->Update(10s);
 
-    EXPECT_EQ(received_info.message, "New message!");
+  EXPECT_EQ(received_info.message, "New message!");
 }
 
 /// @test UpdateConfig does NOT reset timers when only messages change.
-TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenOnlyMessagesChange) {
-    scheduler_->Start();
-    scheduler_->Update(4s);  // 6s remain on short timer
+TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenOnlyMessagesChange)
+{
+  scheduler_->Start();
+  scheduler_->Update(4s);  // 6s remain on short timer
 
-    // Change only the messages — intervals unchanged.
-    short_config_.messages = {"Different message"};
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change only the messages — intervals unchanged.
+  short_config_.messages = {"Different message"};
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    // Scheduler should still be running with elapsed progress preserved.
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 6s);
+  // Scheduler should still be running with elapsed progress preserved.
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 6s);
 }
 
 /// @test UpdateConfig does NOT reset timers when only overlay settings change.
-TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenOverlaySettingsChange) {
-    scheduler_->Start();
-    scheduler_->Update(3s);  // 7s remain on short timer
+TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenOverlaySettingsChange)
+{
+  scheduler_->Start();
+  scheduler_->Update(3s);  // 7s remain on short timer
 
-    // Change overlay opacity and all-monitors flag — no interval changes.
-    overlay_config_.opacity = 1.0f;
-    overlay_config_.show_on_all_monitors = false;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change overlay opacity and all-monitors flag — no interval changes.
+  overlay_config_.opacity = 1.0f;
+  overlay_config_.show_on_all_monitors = false;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 7s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 7s);
 }
 
 /// @test UpdateConfig does NOT reset timers when only the snooze duration changes.
-TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenSnoozeDurationChanges) {
-    scheduler_->Start();
-    scheduler_->Update(6s);  // 4s remain on short timer
+TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenSnoozeDurationChanges)
+{
+  scheduler_->Start();
+  scheduler_->Update(6s);  // 4s remain on short timer
 
-    // Change only snooze duration.
-    overlay_config_.snooze_duration = 10s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change only snooze duration.
+  overlay_config_.snooze_duration = 10s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 4s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 4s);
 }
 
 /// @test UpdateConfig does NOT reset timers when only enabled flags change.
-TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenEnabledFlagChanges) {
-    // Disable long break only — intervals unchanged.
-    short_config_.enabled = true;
-    long_config_.enabled = false;
+TEST_F(BreakSchedulerTest, UpdateConfigPreservesTimersWhenEnabledFlagChanges)
+{
+  // Disable long break only — intervals unchanged.
+  short_config_.enabled = true;
+  long_config_.enabled = false;
 
-    scheduler_->Start();
-    scheduler_->Update(5s);  // 5s remain on short timer
+  scheduler_->Start();
+  scheduler_->Update(5s);  // 5s remain on short timer
 
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 5s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 5s);
 }
 
 /// @test Enabling a break starts its timer when running.
-TEST_F(BreakSchedulerTest, UpdateConfigStartsLongTimerWhenEnabled) {
-    long_config_.enabled = false;
-    scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
+TEST_F(BreakSchedulerTest, UpdateConfigStartsLongTimerWhenEnabled)
+{
+  long_config_.enabled = false;
+  scheduler_ = std::make_unique<BreakScheduler>(short_config_, long_config_, overlay_config_);
 
-    scheduler_->Start();
-    scheduler_->Update(5s);  // 5s remain on short timer
+  scheduler_->Start();
+  scheduler_->Update(5s);  // 5s remain on short timer
 
-    long_config_.enabled = true;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  long_config_.enabled = true;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
-    auto long_remaining = scheduler_->GetTimeUntilLongBreak();
-    ASSERT_TRUE(short_remaining.has_value());
-    ASSERT_TRUE(long_remaining.has_value());
-    EXPECT_EQ(*short_remaining, 5s);
-    EXPECT_EQ(*long_remaining, 60s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+  auto long_remaining = scheduler_->GetTimeUntilLongBreak();
+  ASSERT_TRUE(short_remaining.has_value());
+  ASSERT_TRUE(long_remaining.has_value());
+  EXPECT_EQ(*short_remaining, 5s);
+  EXPECT_EQ(*long_remaining, 60s);
 }
 
 /// @test UpdateConfig RESETS timers when the short break interval changes.
-TEST_F(BreakSchedulerTest, UpdateConfigResetsTimersWhenShortIntervalChanges) {
-    scheduler_->Start();
-    scheduler_->Update(4s);  // 6s would remain on old 10s timer
+TEST_F(BreakSchedulerTest, UpdateConfigResetsTimersWhenShortIntervalChanges)
+{
+  scheduler_->Start();
+  scheduler_->Update(4s);  // 6s would remain on old 10s timer
 
-    // Change short interval to 20s.
-    short_config_.interval = 20s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change short interval to 20s.
+  short_config_.interval = 20s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    // Timer should be reset to new interval (20s), running from scratch.
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 20s);
+  // Timer should be reset to new interval (20s), running from scratch.
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 20s);
 }
 
 /// @test UpdateConfig RESETS timers when the long break interval changes.
-TEST_F(BreakSchedulerTest, UpdateConfigResetsTimersWhenLongIntervalChanges) {
-    scheduler_->Start();
-    scheduler_->Update(10s);  // 50s would remain on old 60s long timer
+TEST_F(BreakSchedulerTest, UpdateConfigResetsTimersWhenLongIntervalChanges)
+{
+  scheduler_->Start();
+  scheduler_->Update(10s);  // 50s would remain on old 60s long timer
 
-    // Change long interval to 30s.
-    long_config_.interval = 30s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change long interval to 30s.
+  long_config_.interval = 30s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilLongBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 30s);
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilLongBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 30s);
 }
 
 /// @test When interval changes, the running state is preserved after reset.
-TEST_F(BreakSchedulerTest, UpdateConfigPreservesRunningStateWhenIntervalChanges) {
-    // Verify: was running → still running after reset.
-    scheduler_->Start();
-    EXPECT_TRUE(scheduler_->IsRunning());
+TEST_F(BreakSchedulerTest, UpdateConfigPreservesRunningStateWhenIntervalChanges)
+{
+  // Verify: was running → still running after reset.
+  scheduler_->Start();
+  EXPECT_TRUE(scheduler_->IsRunning());
 
-    short_config_.interval = 15s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  short_config_.interval = 15s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_TRUE(scheduler_->IsRunning());
+  EXPECT_TRUE(scheduler_->IsRunning());
 
-    // Verify: was NOT running → still not running after reset.
-    scheduler_->Reset();
-    EXPECT_FALSE(scheduler_->IsRunning());
+  // Verify: was NOT running → still not running after reset.
+  scheduler_->Reset();
+  EXPECT_FALSE(scheduler_->IsRunning());
 
-    short_config_.interval = 20s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  short_config_.interval = 20s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    EXPECT_FALSE(scheduler_->IsRunning());
+  EXPECT_FALSE(scheduler_->IsRunning());
 }
 
 /// @test UpdateConfig applies new break duration without resetting interval timers.
-TEST_F(BreakSchedulerTest, UpdateConfigAppliesNewBreakDurationWithoutResettingTimers) {
-    scheduler_->Start();
-    scheduler_->Update(5s);  // 5s remain on short timer
+TEST_F(BreakSchedulerTest, UpdateConfigAppliesNewBreakDurationWithoutResettingTimers)
+{
+  scheduler_->Start();
+  scheduler_->Update(5s);  // 5s remain on short timer
 
-    // Change only the break duration (how long the break itself lasts).
-    short_config_.duration = 10s;
-    scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
+  // Change only the break duration (how long the break itself lasts).
+  short_config_.duration = 10s;
+  scheduler_->UpdateConfig(short_config_, long_config_, overlay_config_);
 
-    // Interval timer progress must be intact.
-    EXPECT_TRUE(scheduler_->IsRunning());
-    auto remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(remaining.has_value());
-    EXPECT_EQ(*remaining, 5s);
+  // Interval timer progress must be intact.
+  EXPECT_TRUE(scheduler_->IsRunning());
+  auto remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(remaining.has_value());
+  EXPECT_EQ(*remaining, 5s);
 
-    // Trigger the break and verify the new duration is used.
-    BreakInfo received_info{};
-    scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
-    scheduler_->Update(5s);  // Expire the short timer
+  // Trigger the break and verify the new duration is used.
+  BreakInfo received_info{};
+  scheduler_->SetOnBreakStart([&received_info](const BreakInfo& info) { received_info = info; });
+  scheduler_->Update(5s);  // Expire the short timer
 
-    EXPECT_EQ(received_info.duration, 10s);
+  EXPECT_EQ(received_info.duration, 10s);
 }
 
-TEST_F(BreakSchedulerTest, ResetTimersResetsWithoutTriggeringCallback) {
-    // Start the scheduler and let it run
-    scheduler_->Start();
-    scheduler_->Update(5s);  // Progress the timer
+TEST_F(BreakSchedulerTest, ResetTimersResetsWithoutTriggeringCallback)
+{
+  // Start the scheduler and let it run
+  scheduler_->Start();
+  scheduler_->Update(5s);  // Progress the timer
 
-    // Set up a callback that should NOT be called
-    bool callback_called = false;
-    scheduler_->SetOnBreakEnd([&callback_called](const BreakInfo&) { callback_called = true; });
+  // Set up a callback that should NOT be called
+  bool callback_called = false;
+  scheduler_->SetOnBreakEnd([&callback_called](const BreakInfo&) { callback_called = true; });
 
-    // Trigger a break first so we can test ResetTimers during a break
-    scheduler_->Update(5s);  // Expire the short timer to trigger a break
-    EXPECT_TRUE(scheduler_->IsBreakActive());
+  // Trigger a break first so we can test ResetTimers during a break
+  scheduler_->Update(5s);  // Expire the short timer to trigger a break
+  EXPECT_TRUE(scheduler_->IsBreakActive());
 
-    // Reset timers - should NOT call OnBreakEnd
-    scheduler_->ResetTimers();
+  // Reset timers - should NOT call OnBreakEnd
+  scheduler_->ResetTimers();
 
-    // Verify the callback was NOT called (key difference from SkipBreak)
-    EXPECT_FALSE(callback_called);
+  // Verify the callback was NOT called (key difference from SkipBreak)
+  EXPECT_FALSE(callback_called);
 
-    // Verify break is no longer active
-    EXPECT_FALSE(scheduler_->IsBreakActive());
+  // Verify break is no longer active
+  EXPECT_FALSE(scheduler_->IsBreakActive());
 
-    // Verify scheduler is still running
-    EXPECT_TRUE(scheduler_->IsRunning());
+  // Verify scheduler is still running
+  EXPECT_TRUE(scheduler_->IsRunning());
 
-    // Verify timers were reset to initial values
-    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(short_remaining.has_value());
-    EXPECT_EQ(*short_remaining, short_config_.interval);
+  // Verify timers were reset to initial values
+  auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(short_remaining.has_value());
+  EXPECT_EQ(*short_remaining, short_config_.interval);
 }
 
-TEST_F(BreakSchedulerTest, ResetTimersWorksWhenNotInBreak) {
-    // Start and progress, but don't trigger a break
-    scheduler_->Start();
-    scheduler_->Update(5s);  // 5s in, still not at break time
+TEST_F(BreakSchedulerTest, ResetTimersWorksWhenNotInBreak)
+{
+  // Start and progress, but don't trigger a break
+  scheduler_->Start();
+  scheduler_->Update(5s);  // 5s in, still not at break time
 
-    // Reset timers
-    scheduler_->ResetTimers();
+  // Reset timers
+  scheduler_->ResetTimers();
 
-    // Verify scheduler is still running
-    EXPECT_TRUE(scheduler_->IsRunning());
+  // Verify scheduler is still running
+  EXPECT_TRUE(scheduler_->IsRunning());
 
-    // Verify timers were reset to initial values
-    auto short_remaining = scheduler_->GetTimeUntilShortBreak();
-    ASSERT_TRUE(short_remaining.has_value());
-    EXPECT_EQ(*short_remaining, short_config_.interval);
+  // Verify timers were reset to initial values
+  auto short_remaining = scheduler_->GetTimeUntilShortBreak();
+  ASSERT_TRUE(short_remaining.has_value());
+  EXPECT_EQ(*short_remaining, short_config_.interval);
 }
 
 }  // namespace

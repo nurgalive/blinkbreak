@@ -1,23 +1,22 @@
 /// @file test_message_provider.cpp
 /// @brief Unit tests for the MessageProvider class.
 
-#include "core/message_provider.hpp"
+#include <set>
 
 #include <gtest/gtest.h>
 
-#include <set>
+#include "core/message_provider.hpp"
 
-namespace blinkbreak {
-namespace {
+namespace blinkbreak
+{
+namespace
+{
 
 /// @brief Test fixture for MessageProvider tests.
-class MessageProviderTest : public ::testing::Test {
+class MessageProviderTest : public ::testing::Test
+{
 protected:
-    std::vector<std::string> test_messages_ = {
-        "Message 1",
-        "Message 2",
-        "Message 3"
-    };
+  std::vector<std::string> test_messages_ = {"Message 1", "Message 2", "Message 3"};
 };
 
 // ============================================================================
@@ -25,30 +24,34 @@ protected:
 // ============================================================================
 
 /// @test Constructor creates provider with messages.
-TEST_F(MessageProviderTest, ConstructorCreatesWithMessages) {
-    MessageProvider provider(test_messages_);
-    EXPECT_EQ(provider.GetMessageCount(), 3);
+TEST_F(MessageProviderTest, ConstructorCreatesWithMessages)
+{
+  MessageProvider provider(test_messages_);
+  EXPECT_EQ(provider.GetMessageCount(), 3);
 }
 
 /// @test Empty messages get default message.
-TEST_F(MessageProviderTest, EmptyMessagesGetDefault) {
-    MessageProvider provider({});
-    EXPECT_EQ(provider.GetMessageCount(), 1);
-    EXPECT_EQ(provider.GetNext(), "Take a break!");
+TEST_F(MessageProviderTest, EmptyMessagesGetDefault)
+{
+  MessageProvider provider({});
+  EXPECT_EQ(provider.GetMessageCount(), 1);
+  EXPECT_EQ(provider.GetNext(), "Take a break!");
 }
 
 /// @test GetCurrent returns first message initially.
-TEST_F(MessageProviderTest, GetCurrentReturnsFirstInitially) {
-    MessageProvider provider(test_messages_, false);
-    EXPECT_EQ(provider.GetCurrent(), "Message 1");
+TEST_F(MessageProviderTest, GetCurrentReturnsFirstInitially)
+{
+  MessageProvider provider(test_messages_, false);
+  EXPECT_EQ(provider.GetCurrent(), "Message 1");
 }
 
 /// @test GetNext returns messages in order when not rotating.
-TEST_F(MessageProviderTest, GetNextReturnsFirstWhenNotRotating) {
-    MessageProvider provider(test_messages_, false);
-    EXPECT_EQ(provider.GetNext(), "Message 1");
-    EXPECT_EQ(provider.GetNext(), "Message 1");
-    EXPECT_EQ(provider.GetNext(), "Message 1");
+TEST_F(MessageProviderTest, GetNextReturnsFirstWhenNotRotating)
+{
+  MessageProvider provider(test_messages_, false);
+  EXPECT_EQ(provider.GetNext(), "Message 1");
+  EXPECT_EQ(provider.GetNext(), "Message 1");
+  EXPECT_EQ(provider.GetNext(), "Message 1");
 }
 
 // ============================================================================
@@ -56,21 +59,23 @@ TEST_F(MessageProviderTest, GetNextReturnsFirstWhenNotRotating) {
 // ============================================================================
 
 /// @test GetNext rotates through messages.
-TEST_F(MessageProviderTest, GetNextRotatesThroughMessages) {
-    MessageProvider provider(test_messages_, true, false);
-    EXPECT_EQ(provider.GetNext(), "Message 1");
-    EXPECT_EQ(provider.GetNext(), "Message 2");
-    EXPECT_EQ(provider.GetNext(), "Message 3");
-    EXPECT_EQ(provider.GetNext(), "Message 1");  // Wraps around
+TEST_F(MessageProviderTest, GetNextRotatesThroughMessages)
+{
+  MessageProvider provider(test_messages_, true, false);
+  EXPECT_EQ(provider.GetNext(), "Message 1");
+  EXPECT_EQ(provider.GetNext(), "Message 2");
+  EXPECT_EQ(provider.GetNext(), "Message 3");
+  EXPECT_EQ(provider.GetNext(), "Message 1");  // Wraps around
 }
 
 /// @test Reset returns to first message.
-TEST_F(MessageProviderTest, ResetReturnsToFirst) {
-    MessageProvider provider(test_messages_, true, false);
-    (void)provider.GetNext();
-    (void)provider.GetNext();
-    provider.Reset();
-    EXPECT_EQ(provider.GetNext(), "Message 1");
+TEST_F(MessageProviderTest, ResetReturnsToFirst)
+{
+  MessageProvider provider(test_messages_, true, false);
+  (void)provider.GetNext();
+  (void)provider.GetNext();
+  provider.Reset();
+  EXPECT_EQ(provider.GetNext(), "Message 1");
 }
 
 // ============================================================================
@@ -78,15 +83,17 @@ TEST_F(MessageProviderTest, ResetReturnsToFirst) {
 // ============================================================================
 
 /// @test Random mode returns all messages.
-TEST_F(MessageProviderTest, RandomModeReturnsAllMessages) {
-    MessageProvider provider(test_messages_, true, true);
-    std::set<std::string> seen;
+TEST_F(MessageProviderTest, RandomModeReturnsAllMessages)
+{
+  MessageProvider provider(test_messages_, true, true);
+  std::set<std::string> seen;
 
-    for (int i = 0; i < 3; ++i) {
-        seen.insert(provider.GetNext());
-    }
+  for (int i = 0; i < 3; ++i)
+  {
+    seen.insert(provider.GetNext());
+  }
 
-    EXPECT_EQ(seen.size(), 3);
+  EXPECT_EQ(seen.size(), 3);
 }
 
 // ============================================================================
@@ -94,22 +101,24 @@ TEST_F(MessageProviderTest, RandomModeReturnsAllMessages) {
 // ============================================================================
 
 /// @test SetMessages updates messages.
-TEST_F(MessageProviderTest, SetMessagesUpdatesMessages) {
-    MessageProvider provider(test_messages_);
-    provider.SetMessages({"New message"});
+TEST_F(MessageProviderTest, SetMessagesUpdatesMessages)
+{
+  MessageProvider provider(test_messages_);
+  provider.SetMessages({"New message"});
 
-    EXPECT_EQ(provider.GetMessageCount(), 1);
-    EXPECT_EQ(provider.GetNext(), "New message");
+  EXPECT_EQ(provider.GetMessageCount(), 1);
+  EXPECT_EQ(provider.GetNext(), "New message");
 }
 
 /// @test SetRotate changes rotation behavior.
-TEST_F(MessageProviderTest, SetRotateChangesRotation) {
-    MessageProvider provider(test_messages_, false);
-    (void)provider.GetNext();
-    provider.SetRotate(true);
+TEST_F(MessageProviderTest, SetRotateChangesRotation)
+{
+  MessageProvider provider(test_messages_, false);
+  (void)provider.GetNext();
+  provider.SetRotate(true);
 
-    EXPECT_EQ(provider.GetNext(), "Message 1");
-    EXPECT_EQ(provider.GetNext(), "Message 2");
+  EXPECT_EQ(provider.GetNext(), "Message 1");
+  EXPECT_EQ(provider.GetNext(), "Message 2");
 }
 
 // ============================================================================
@@ -117,12 +126,13 @@ TEST_F(MessageProviderTest, SetRotateChangesRotation) {
 // ============================================================================
 
 /// @test Move constructor works correctly.
-TEST_F(MessageProviderTest, MoveConstructorWorks) {
-    MessageProvider provider(test_messages_, true, false);
-    (void)provider.GetNext();  // Advance to Message 2
+TEST_F(MessageProviderTest, MoveConstructorWorks)
+{
+  MessageProvider provider(test_messages_, true, false);
+  (void)provider.GetNext();  // Advance to Message 2
 
-    MessageProvider moved(std::move(provider));
-    EXPECT_EQ(moved.GetNext(), "Message 2");
+  MessageProvider moved(std::move(provider));
+  EXPECT_EQ(moved.GetNext(), "Message 2");
 }
 
 }  // namespace

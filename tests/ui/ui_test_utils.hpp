@@ -5,13 +5,15 @@
 
 #include <string>
 
-namespace blinkbreak::ui_test {
+namespace blinkbreak::ui_test
+{
 
 /// @brief Converts a Slint SharedString into a standard string.
 /// @param value Slint string to convert.
 /// @return A std::string containing the same character data.
-inline std::string ToStdString(const slint::SharedString& value) {
-    return std::string(value.data(), value.size());
+inline std::string ToStdString(const slint::SharedString& value)
+{
+  return std::string(value.data(), value.size());
 }
 
 /// @brief Records how many times a zero-argument callback is invoked.
@@ -23,12 +25,13 @@ inline std::string ToStdString(const slint::SharedString& value) {
 /// component->invoke_clicked();
 /// EXPECT_EQ(spy.count, 1);
 /// @endcode
-struct CallbackSpy {
-    /// @brief Number of times the callback has been invoked.
-    int count = 0;
+struct CallbackSpy
+{
+  /// @brief Number of times the callback has been invoked.
+  int count = 0;
 
-    /// @brief Increments the invocation count.
-    void operator()() { ++count; }
+  /// @brief Increments the invocation count.
+  void operator()() { ++count; }
 };
 
 /// @brief Records invocations and the last boolean value passed.
@@ -41,17 +44,19 @@ struct CallbackSpy {
 /// EXPECT_EQ(spy.count, 1);
 /// EXPECT_TRUE(spy.last_value);
 /// @endcode
-struct BoolCallbackSpy {
-    /// @brief Number of times the callback has been invoked.
-    int count = 0;
-    /// @brief Last boolean value observed from the callback.
-    bool last_value = false;
+struct BoolCallbackSpy
+{
+  /// @brief Number of times the callback has been invoked.
+  int count = 0;
+  /// @brief Last boolean value observed from the callback.
+  bool last_value = false;
 
-    /// @brief Records the invocation and latest value.
-    void operator()(bool value) {
-        ++count;
-        last_value = value;
-    }
+  /// @brief Records the invocation and latest value.
+  void operator()(bool value)
+  {
+    ++count;
+    last_value = value;
+  }
 };
 
 }  // namespace blinkbreak::ui_test

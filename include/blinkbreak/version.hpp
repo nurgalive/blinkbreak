@@ -4,7 +4,8 @@
 #ifndef BLINKBREAK_VERSION_HPP
 #define BLINKBREAK_VERSION_HPP
 
-namespace blinkbreak {
+namespace blinkbreak
+{
 
 /// @brief Major version number.
 constexpr int kVersionMajor = 0;

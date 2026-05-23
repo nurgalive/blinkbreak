@@ -118,10 +118,10 @@ cmake --preset ninja-debug
 cmake --build --preset ninja-debug
 ```
 
-Generate compile commands:
+Generate and patch compile commands:
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\update_compile_commands.ps1
+```bash
+python scripts/update_compile_commands.py
 ```
 
 #### Debug dev build
@@ -193,17 +193,17 @@ Use simple, exported properties and callbacks so UI tests can drive logic withou
 
 ### Clangd support
 
-Create a `compile_commands.json` for clangd:
+A `compile_commands.json` is required for clangd.
 
-```powershell
-cmake -S . -B build/ninja-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY -DCMAKE_C_COMPILER="C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe" -DCMAKE_CXX_COMPILER="C:/Program Files/Microsoft Visual Studio/2022/Professional/VC/Tools/MSVC/14.44.35207/bin/Hostx64/x64/cl.exe"
+To generate it safely, run the ninja debug preset and our update script. The script copies the compilation database to the root folder, switches MSVC flags to clang-cl compatible flags, and formats the output properly.
+
+```bash
+cmake --preset ninja-debug
+cmake --build --preset ninja-debug
+python scripts/update_compile_commands.py
 ```
 
-Check that `compile_commands.json` is generated:
-
-```powershell
-ls build/ninja-debug/compile_commands.json
-```
+Verify that `compile_commands.json` now exists at the root of the project.
 
 ### Clang-Format
 

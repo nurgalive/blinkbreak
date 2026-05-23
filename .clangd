@@ -1,41 +1,7 @@
 # clangd configuration for BlinkBreak
-# compile_commands.json at the project root is built/ninja-debug/compile_commands.json
-# (Ninja build: complete flags, all Slint includes, -std:c++latest).
 
 ---
-# ── Global settings applying to all files ─────────────────────────────────────
 CompileFlags:
-  Remove:
-    # Strip cl.exe/clang-cl std flags — we re-add the correct one per file type below
-    - "-std=*"
-    - "/std:*"
-    - "-std:*"
-    # MSVC-specific flags not understood by clang-cl
-    - "/MD*"
-    - "-MDd"
-    - "-MD"
-    - "/Zi"
-    - "-Zi"
-    - "-Zd"
-    - "/wd*"
-    - "/Ob*"
-    - "/Od"
-    - "/RTC*"
-    - "/FS"
-    - "/Fd*"
-    - "/Fo*"
-    - "/nologo"
-    - "/TP"
-    - "/bigobj"
-    - "/GS"
-    - "/W4"
-    - "/WX"
-    - "/MP"
-    - "/EHsc"
-    - "-EHsc"
-    - "/J"
-    - "/showIncludes"
-
   Add:
     # Supplemental Slint include paths for any file that might open without a
     # matching compile_commands entry
@@ -50,9 +16,14 @@ CompileFlags:
     # GoogleTest / GoogleMock for test files
     - "-Ibuild/ninja-debug/_deps/googletest-src/googletest/include"
     - "-Ibuild/ninja-debug/_deps/googletest-src/googlemock/include"
+    # Third-party dependencies
+    - "-Ibuild/ninja-debug/_deps/glaze-src/include"
+    - "-Ibuild/ninja-debug/_deps/spdlog-src/include"
     # project headers
     - "-Iinclude"
     - "-Isrc"
+    # Suppress unknown argument warnings from clang-cl for MSVC-specific flags
+    - "-Wno-unused-command-line-argument"
 
 Diagnostics:
   Suppress:
@@ -60,17 +31,6 @@ Diagnostics:
     - "unused-parameter"
     - "unused-variable"
     - "unknown-attributes"
-
-  ClangTidy:
-    Add:
-      - "modernize-*"
-      - "readability-*"
-      - "performance-*"
-    Remove:
-      - "modernize-use-trailing-return-type"
-      - "readability-identifier-length"
-      - "readability-magic-numbers"
-      - "readability-identifier-naming"
 
 Index:
   Background: Build
@@ -89,26 +49,12 @@ Completion:
   AllScopes: true
 
 ---
-# ── C++ source files (.cpp / .cc) — take std from compile_commands + re-add ──
-If:
-  PathMatch: ".*\\.(cpp|cc|cxx)$"
-CompileFlags:
-  Add:
-    - "-std=c++23"
-    - "-fms-compatibility-version=19.44"
-
----
-# ── Header files (.hpp / .h) — must force C++23 explicitly ───────────────────
-# Headers are NOT in compile_commands.json; clangd falls back to C++14 for them.
-# The PathMatch condition lets us apply std only to headers.
+# ── Header files (.hpp / .h) — force C++23 explicitly ───────────────────
+# Headers are NOT in compile_commands.json; clangd falls back to C++14 for them
+# if it cannot inherit from a .cpp file.
 If:
   PathMatch: ".*\\.(hpp|h)$"
 CompileFlags:
   Add:
-    - "-std=c++23"
-    - "-fms-compatibility-version=19.44"
-    - "-fms-extensions"
-    - "-fms-compatibility"
-    - "-D_WIN32"
-    - "-DWIN32"
-    - "-D_WINDOWS"
+    - "--driver-mode=cl"
+    - "/std:c++23"

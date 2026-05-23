@@ -1,13 +1,13 @@
 # Google C++ Style Guide based configuration
 Language: Cpp
 BasedOnStyle: Google
-Standard: "c++20"
+Standard: Latest
 
 # Indentation
-IndentWidth: 4
-TabWidth: 4
+IndentWidth: 2
+TabWidth: 2
 UseTab: Never
-AccessModifierOffset: -4
+AccessModifierOffset: -2
 IndentCaseLabels: true
 IndentPPDirectives: BeforeHash
 NamespaceIndentation: None
@@ -25,7 +25,7 @@ AlwaysBreakAfterReturnType: None
 AlwaysBreakTemplateDeclarations: Yes
 BinPackArguments: true
 BinPackParameters: true
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Allman
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeColon
 BreakInheritanceList: BeforeColon
@@ -55,15 +55,23 @@ AlignTrailingComments: true
 
 # Includes
 IncludeBlocks: Regroup
+IncludeIsMainRegex: '(_test|-test|Test)?$'
 IncludeCategories:
-  - Regex: "^<blinkbreak/"
-    Priority: 1
-  - Regex: "^<(gtest|gmock)/"
-    Priority: 3
-  - Regex: "^<"
-    Priority: 2
-  - Regex: ".*"
+  # 4. Third-party libraries (known project dependencies)
+  - Regex: '^["<](boost|gtest|gmock|glaze|glz|spdlog|fmt|slint|wintoast)/'
     Priority: 4
+  # 2. C system headers, Linux headers, etc., in angle brackets ending with .h
+  - Regex: '^<.*\.h>'
+    Priority: 2
+  # 3. C++ Standard Library (angle brackets without an extension)
+  - Regex: '^<[^.]+>'
+    Priority: 3
+  # 4. Fallback for any other third-party headers in angle brackets (e.g., <boost/optional.hpp>)
+  - Regex: '^<.*'
+    Priority: 4
+  # 5. Other project headers (in quotes)
+  - Regex: '.*'
+    Priority: 5
 SortIncludes: true
 
 # Other

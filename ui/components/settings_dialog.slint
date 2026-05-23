@@ -24,7 +24,7 @@ component NumberFieldRow inherits Rectangle {
 
         Text {
             text: root.label;
-            width: 140px;
+            width: 280px;
             vertical-alignment: center;
             font-size: 12px;
             color: Palette.foreground;
@@ -46,9 +46,9 @@ component NumberFieldRow inherits Rectangle {
 
 export component SettingsDialog inherits Window {
     title: "Settings";
-    min-width: 360px;
+    min-width: 500px;
     min-height: 380px;
-    preferred-width: 360px;
+    preferred-width: 520px;
     preferred-height: 380px;
     background: Palette.background;
 
@@ -80,8 +80,10 @@ export component SettingsDialog inherits Window {
     in-out property <bool> idle-show-timer: false;
 
     // Reset breaks on idle settings
-    in-out property <bool> idle-reset-on-idle: true;
-    in-out property <string> idle-reset-threshold-minutes: "20";
+    in-out property <bool> idle-reset-short-on-idle: true;
+    in-out property <string> idle-reset-short-threshold-minutes: "20";
+    in-out property <bool> idle-reset-long-on-idle: true;
+    in-out property <string> idle-reset-long-threshold-minutes: "20";
 
     in-out property <string> validation-error: "";
     out property <bool> has-validation-error: root.validation-error != "";
@@ -168,7 +170,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Display on all monitors";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -185,7 +187,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Opaque overlay";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -209,7 +211,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Follow system theme";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -226,7 +228,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Dark theme";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -251,7 +253,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Enable notifications";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -274,7 +276,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Respect DND";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -291,7 +293,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Respect full-screen apps";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -315,7 +317,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Enable idle detection";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -338,7 +340,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Pause on idle";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -355,7 +357,7 @@ export component SettingsDialog inherits Window {
 
                     Text {
                         text: "Show idle timer";
-                        width: 140px;
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
@@ -371,22 +373,45 @@ export component SettingsDialog inherits Window {
                     alignment: start;
 
                     Text {
-                        text: "Reset breaks on idle";
-                        width: 140px;
+                        text: "Reset short break on idle";
+                        width: 280px;
                         vertical-alignment: center;
                         font-size: 12px;
                         color: Palette.foreground;
                     }
 
                     Switch {
-                        checked <=> root.idle-reset-on-idle;
+                        checked <=> root.idle-reset-short-on-idle;
                     }
                 }
 
                 NumberFieldRow {
-                    label: "Reset breaks on idle threshold";
+                    label: "Reset short break on idle threshold";
                     unit: "minutes";
-                    value <=> root.idle-reset-threshold-minutes;
+                    value <=> root.idle-reset-short-threshold-minutes;
+                }
+
+                HorizontalBox {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: "Reset long break on idle";
+                        width: 280px;
+                        vertical-alignment: center;
+                        font-size: 12px;
+                        color: Palette.foreground;
+                    }
+
+                    Switch {
+                        checked <=> root.idle-reset-long-on-idle;
+                    }
+                }
+
+                NumberFieldRow {
+                    label: "Reset long break on idle threshold";
+                    unit: "minutes";
+                    value <=> root.idle-reset-long-threshold-minutes;
                 }
 
                 if root.validation-error != "": Text {

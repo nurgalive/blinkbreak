@@ -1397,7 +1397,7 @@ Migrate the configuration system from RapidJSON to Glaze for improved performanc
 
 ### Goal (9D)
 
-Rename and consolidate idle reset behavior so the extended-idle reset becomes the only reset-on-idle mechanism. The "Reset breaks on idle" toggle now controls a threshold-based reset of both short and long timers (default 20 minutes).
+Split reset-on-idle into separate short and long break settings with independent thresholds, while keeping extended-idle behavior per break (default 20 minutes each).
 
 ### Prerequisites (9D)
 
@@ -1408,32 +1408,37 @@ Rename and consolidate idle reset behavior so the extended-idle reset becomes th
 **Configuration Changes:**
 
 - Removed the legacy immediate reset-on-idle path.
-- Reused `reset_on_idle` as the "Reset breaks on idle" toggle (extended-idle behavior).
-- Added `reset_threshold` (`reset_threshold_seconds` in JSON, default 1200s/20 minutes).
-- Updated validation to require `reset_threshold` > `threshold` when enabled.
+- Split the toggle into `reset_short_on_idle` and `reset_long_on_idle`.
+- Added per-break thresholds:
+  - `reset_short_threshold` (`reset_short_threshold_seconds` in JSON, default 1200s/20 minutes)
+  - `reset_long_threshold` (`reset_long_threshold_seconds` in JSON, default 1200s/20 minutes)
+- Updated validation to require each enabled reset threshold > `threshold`.
 - Updated `default_config.json`.
+- Added legacy mapping so old `reset_on_idle` + `reset_threshold_seconds` apply to both new settings on load.
 
 **UI Changes:**
 
-- Removed the extended idle controls.
-- Added "Reset breaks on idle" toggle and "Reset breaks on idle threshold" (minutes) field.
+- Removed the single "Reset breaks on idle" toggle/threshold.
+- Added "Reset short break on idle" and "Reset long break on idle" toggles with thresholds (minutes).
 
 **AppController Integration:**
 
-- Renamed `extended_idle_reset_triggered_` to `reset_on_idle_triggered_`.
-- Uses `reset_on_idle` + `reset_threshold` to reset both break timers after extended idle.
-- Clears the reset-on-idle flag on activity.
+- Track separate reset flags for short and long timers.
+- Use `reset_short_on_idle` + `reset_short_threshold` to reset the short timer only.
+- Use `reset_long_on_idle` + `reset_long_threshold` to reset the long timer only.
+- Clear both reset-on-idle flags on activity.
 
 ### Test Requirements (9D)
 
 **Unit Tests (updated in `test_config_manager.cpp`):**
 
 1. `ResetOnIdleDefaults`
-2. `ValidateDetectsResetOnIdleThresholdTooSmall`
-3. `ValidateAcceptsValidResetOnIdleThreshold`
-4. `ValidateSkipsResetOnIdleWhenDisabled`
-5. `ParseJsonReadsResetOnIdleConfig`
-6. `ToJsonRoundtripPreservesResetOnIdleValues`
+2. `ValidateDetectsResetShortOnIdleThresholdTooSmall`
+3. `ValidateDetectsResetLongOnIdleThresholdTooSmall`
+4. `ValidateAcceptsValidResetOnIdleThresholds`
+5. `ValidateSkipsResetOnIdleWhenDisabled`
+6. `ParseJsonReadsResetOnIdleConfig`
+7. `ToJsonRoundtripPreservesResetOnIdleValues`
 
 **UI Tests (updated in `test_settings_dialog.cpp`):**
 
@@ -1450,10 +1455,12 @@ Rename and consolidate idle reset behavior so the extended-idle reset becomes th
 
 ### Deliverables (9D)
 
-- [x] Single reset-on-idle path using extended-idle behavior
-- [x] `IdleConfig.reset_threshold` with JSON key `reset_threshold_seconds`
-- [x] Settings dialog renamed to "Reset breaks on idle" with threshold field
-- [x] AppController updated reset-on-idle logic
+- [x] Separate reset-on-idle toggles for short and long breaks
+- [x] `IdleConfig.reset_short_threshold` with JSON key `reset_short_threshold_seconds`
+- [x] `IdleConfig.reset_long_threshold` with JSON key `reset_long_threshold_seconds`
+- [x] Settings dialog updated with short/long reset toggles and thresholds
+- [x] AppController updated reset-on-idle logic with per-break resets
+- [x] Legacy `reset_on_idle` + `reset_threshold_seconds` mapping applied on load
 - [x] Tests updated for new config/UI properties
 
 ---

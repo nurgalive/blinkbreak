@@ -233,7 +233,8 @@ private:
     bool is_paused_by_idle_;
     bool show_idle_timer_;
     std::string idle_time_;
-    bool reset_on_idle_triggered_;  ///< Tracks if reset on idle was triggered this session.
+    bool reset_short_on_idle_triggered_;  ///< Tracks if short reset on idle was triggered.
+    bool reset_long_on_idle_triggered_;   ///< Tracks if long reset on idle was triggered.
 };
 
 }  // namespace blinkbreak

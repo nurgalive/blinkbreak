@@ -100,8 +100,10 @@ TEST(SettingsDialogUiTest, IdleDetectionDefaults) {
     EXPECT_TRUE(dialog->get_idle_enabled());
     EXPECT_EQ(ToStdString(dialog->get_idle_threshold_minutes()), "3");
     EXPECT_TRUE(dialog->get_idle_pause_on_idle());
-    EXPECT_TRUE(dialog->get_idle_reset_on_idle());
-    EXPECT_EQ(ToStdString(dialog->get_idle_reset_threshold_minutes()), "20");
+    EXPECT_TRUE(dialog->get_idle_reset_short_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_short_threshold_minutes()), "20");
+    EXPECT_TRUE(dialog->get_idle_reset_long_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_long_threshold_minutes()), "20");
 }
 
 /// @test Verifies idle detection settings round-trip.
@@ -111,25 +113,33 @@ TEST(SettingsDialogUiTest, IdleDetectionRoundTrip) {
     dialog->set_idle_enabled(false);
     dialog->set_idle_threshold_minutes("5");
     dialog->set_idle_pause_on_idle(false);
-    dialog->set_idle_reset_on_idle(false);
-    dialog->set_idle_reset_threshold_minutes("30");
+    dialog->set_idle_reset_short_on_idle(false);
+    dialog->set_idle_reset_short_threshold_minutes("30");
+    dialog->set_idle_reset_long_on_idle(false);
+    dialog->set_idle_reset_long_threshold_minutes("45");
 
     EXPECT_FALSE(dialog->get_idle_enabled());
     EXPECT_EQ(ToStdString(dialog->get_idle_threshold_minutes()), "5");
     EXPECT_FALSE(dialog->get_idle_pause_on_idle());
-    EXPECT_FALSE(dialog->get_idle_reset_on_idle());
-    EXPECT_EQ(ToStdString(dialog->get_idle_reset_threshold_minutes()), "30");
+    EXPECT_FALSE(dialog->get_idle_reset_short_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_short_threshold_minutes()), "30");
+    EXPECT_FALSE(dialog->get_idle_reset_long_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_long_threshold_minutes()), "45");
 
     // Toggle back
     dialog->set_idle_enabled(true);
     dialog->set_idle_pause_on_idle(true);
-    dialog->set_idle_reset_on_idle(true);
-    dialog->set_idle_reset_threshold_minutes("15");
+    dialog->set_idle_reset_short_on_idle(true);
+    dialog->set_idle_reset_short_threshold_minutes("15");
+    dialog->set_idle_reset_long_on_idle(true);
+    dialog->set_idle_reset_long_threshold_minutes("25");
 
     EXPECT_TRUE(dialog->get_idle_enabled());
     EXPECT_TRUE(dialog->get_idle_pause_on_idle());
-    EXPECT_TRUE(dialog->get_idle_reset_on_idle());
-    EXPECT_EQ(ToStdString(dialog->get_idle_reset_threshold_minutes()), "15");
+    EXPECT_TRUE(dialog->get_idle_reset_short_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_short_threshold_minutes()), "15");
+    EXPECT_TRUE(dialog->get_idle_reset_long_on_idle());
+    EXPECT_EQ(ToStdString(dialog->get_idle_reset_long_threshold_minutes()), "25");
 }
 
 /// @test Verifies theme defaults and toggle availability.

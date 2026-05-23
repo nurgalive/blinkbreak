@@ -20,7 +20,8 @@ protected:
         config.idle.enabled = true;
         config.idle.threshold = Duration(10);  // 10 seconds
         config.idle.pause_on_idle = true;
-        config.idle.reset_on_idle = false;
+        config.idle.reset_short_on_idle = false;
+        config.idle.reset_long_on_idle = false;
         config.notification.enabled = false;
         config.auto_start = true;
         harness_.Initialize(config);
@@ -69,8 +70,9 @@ TEST_F(IdleIntegrationTest, TimerResumesOnActive) {
 TEST_F(IdleIntegrationTest, TimerResetsOnIdleWhenConfigured) {
     AppConfig config = harness_.GetConfig();
     config.idle.pause_on_idle = false;
-    config.idle.reset_on_idle = true;
-    config.idle.reset_threshold = Duration(12);  // 12 seconds
+    config.idle.reset_short_on_idle = true;
+    config.idle.reset_short_threshold = Duration(12);  // 12 seconds
+    config.idle.reset_long_on_idle = false;
     harness_.UpdateConfig(config);
 
     // Advance halfway through the interval
@@ -200,7 +202,8 @@ TEST_F(IdleIntegrationTest, PauseOnIdlePreservesProgress) {
     AppConfig config = harness_.GetConfig();
     config.short_break.interval = Duration(30);
     config.idle.pause_on_idle = true;
-    config.idle.reset_on_idle = false;
+    config.idle.reset_short_on_idle = false;
+    config.idle.reset_long_on_idle = false;
     harness_.UpdateConfig(config);
 
     // Advance 20 seconds (10 seconds remaining)

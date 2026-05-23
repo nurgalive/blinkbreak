@@ -27,11 +27,17 @@ struct IdleConfig {
     bool pause_on_idle = true;              ///< Pause timer when idle.
     bool show_timer = false;                ///< Show idle timer in UI.
 
-    /// @brief Reset breaks on idle settings.
-    /// When enabled, after the user is idle for reset_threshold duration,
-    /// both short and long break timers will be reset (as if the user took both breaks).
-    bool reset_on_idle = true;                 ///< Enable resetting breaks after idle threshold.
-    Duration reset_threshold = Duration(1200); ///< 20 minutes default.
+    /// @brief Reset short break on idle settings.
+    /// When enabled, after the user is idle for reset_short_threshold duration,
+    /// the short break timer will be reset (as if the short break was taken).
+    bool reset_short_on_idle = true;                  ///< Enable short-break reset after idle.
+    Duration reset_short_threshold = Duration(1200);  ///< 20 minutes default.
+
+    /// @brief Reset long break on idle settings.
+    /// When enabled, after the user is idle for reset_long_threshold duration,
+    /// the long break timer will be reset (as if the long break was taken).
+    bool reset_long_on_idle = true;                  ///< Enable long-break reset after idle.
+    Duration reset_long_threshold = Duration(1200);  ///< 20 minutes default.
 };
 
 /// @brief Configuration for notifications.
@@ -82,11 +88,12 @@ struct glz::meta<blinkbreak::BreakConfig> {
 template <>
 struct glz::meta<blinkbreak::IdleConfig> {
     using T = blinkbreak::IdleConfig;
-    static constexpr auto value = glz::object(
-        "enabled", &T::enabled, "threshold_seconds", &T::threshold, "pause_on_idle",
-        &T::pause_on_idle, "show_timer", &T::show_timer,
-        "reset_on_idle", &T::reset_on_idle,
-        "reset_threshold_seconds", &T::reset_threshold);
+    static constexpr auto value =
+        glz::object("enabled", &T::enabled, "threshold_seconds", &T::threshold, "pause_on_idle",
+                    &T::pause_on_idle, "show_timer", &T::show_timer, "reset_short_on_idle",
+                    &T::reset_short_on_idle, "reset_short_threshold_seconds",
+                    &T::reset_short_threshold, "reset_long_on_idle", &T::reset_long_on_idle,
+                    "reset_long_threshold_seconds", &T::reset_long_threshold);
 };
 
 template <>

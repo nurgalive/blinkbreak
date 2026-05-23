@@ -199,6 +199,40 @@ void BreakScheduler::ResetTimers() {
     // Note: We intentionally do NOT call on_break_end_ here
 }
 
+void BreakScheduler::ResetShortTimer() {
+    if (!short_config_.enabled) {
+        return;
+    }
+
+    warning_sent_ = false;
+    short_timer_->Reset();
+    short_interval_total_ = short_config_.interval;
+
+    const bool can_start = is_running_ && !break_active_ && !snooze_timer_->IsRunning();
+    if (can_start) {
+        short_timer_->Start();
+    }
+
+    spdlog::info("Short break timer reset");
+}
+
+void BreakScheduler::ResetLongTimer() {
+    if (!long_config_.enabled) {
+        return;
+    }
+
+    warning_sent_ = false;
+    long_timer_->Reset();
+    long_interval_total_ = long_config_.interval;
+
+    const bool can_start = is_running_ && !break_active_ && !snooze_timer_->IsRunning();
+    if (can_start) {
+        long_timer_->Start();
+    }
+
+    spdlog::info("Long break timer reset");
+}
+
 void BreakScheduler::SnoozeBreak(std::optional<Duration> duration) {
     if (!break_active_) {
         spdlog::debug("No break to snooze");

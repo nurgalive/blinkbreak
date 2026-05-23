@@ -84,6 +84,12 @@ public:
     /// Used for DND suppression when a break should be silently skipped.
     void ResetTimers();
 
+    /// @brief Resets the short break timer without triggering OnBreakEnd callback.
+    void ResetShortTimer();
+
+    /// @brief Resets the long break timer without triggering OnBreakEnd callback.
+    void ResetLongTimer();
+
     /// @brief Snoozes the current break.
     /// @param duration Optional custom snooze duration.
     void SnoozeBreak(std::optional<Duration> duration = std::nullopt);

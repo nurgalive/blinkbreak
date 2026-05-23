@@ -209,7 +209,8 @@ private:
     std::unique_ptr<BreakScheduler> scheduler_;
 
     bool is_paused_by_idle_ = false;
-    bool reset_on_idle_triggered_ = false;
+    bool reset_short_on_idle_triggered_ = false;
+    bool reset_long_on_idle_triggered_ = false;
     bool break_in_progress_ = false;
     BreakInfo current_break_info_;
 };

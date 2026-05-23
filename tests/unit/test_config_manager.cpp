@@ -402,24 +402,27 @@ TEST_F(ConfigManagerTest, ValidateDetectsInvalidSnoozeDuration) {
 TEST_F(ConfigManagerTest, ResetOnIdleDefaults) {
     auto config = ConfigManager::GetDefault();
 
-    EXPECT_TRUE(config.idle.reset_on_idle);
-    EXPECT_EQ(config.idle.reset_threshold, 1200s);  // 20 minutes
+    EXPECT_TRUE(config.idle.reset_short_on_idle);
+    EXPECT_EQ(config.idle.reset_short_threshold, 1200s);  // 20 minutes
+    EXPECT_TRUE(config.idle.reset_long_on_idle);
+    EXPECT_EQ(config.idle.reset_long_threshold, 1200s);  // 20 minutes
 }
 
-/// @test Validate detects reset threshold <= regular idle threshold.
-TEST_F(ConfigManagerTest, ValidateDetectsResetOnIdleThresholdTooSmall) {
+/// @test Validate detects short reset threshold <= regular idle threshold.
+TEST_F(ConfigManagerTest, ValidateDetectsResetShortOnIdleThresholdTooSmall) {
     auto config = ConfigManager::GetDefault();
     config.idle.enabled = true;
     config.idle.threshold = 180s;
-    config.idle.reset_on_idle = true;
-    config.idle.reset_threshold = 60s;  // Less than regular threshold
+    config.idle.reset_short_on_idle = true;
+    config.idle.reset_short_threshold = 60s;  // Less than regular threshold
+    config.idle.reset_long_on_idle = false;
 
     auto errors = config_manager_->Validate(config);
 
     EXPECT_FALSE(errors.empty());
     bool found_reset_threshold_error = false;
     for (const auto& error : errors) {
-        if (error.field.find("reset_threshold") != std::string::npos) {
+        if (error.field.find("reset_short_threshold") != std::string::npos) {
             found_reset_threshold_error = true;
             break;
         }
@@ -427,20 +430,45 @@ TEST_F(ConfigManagerTest, ValidateDetectsResetOnIdleThresholdTooSmall) {
     EXPECT_TRUE(found_reset_threshold_error);
 }
 
-/// @test Validate accepts reset threshold > regular idle threshold.
-TEST_F(ConfigManagerTest, ValidateAcceptsValidResetOnIdleThreshold) {
+/// @test Validate detects long reset threshold <= regular idle threshold.
+TEST_F(ConfigManagerTest, ValidateDetectsResetLongOnIdleThresholdTooSmall) {
     auto config = ConfigManager::GetDefault();
     config.idle.enabled = true;
     config.idle.threshold = 180s;
-    config.idle.reset_on_idle = true;
-    config.idle.reset_threshold = 1200s;  // Greater than regular threshold
+    config.idle.reset_long_on_idle = true;
+    config.idle.reset_long_threshold = 60s;  // Less than regular threshold
+    config.idle.reset_short_on_idle = false;
+
+    auto errors = config_manager_->Validate(config);
+
+    EXPECT_FALSE(errors.empty());
+    bool found_reset_threshold_error = false;
+    for (const auto& error : errors) {
+        if (error.field.find("reset_long_threshold") != std::string::npos) {
+            found_reset_threshold_error = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found_reset_threshold_error);
+}
+
+/// @test Validate accepts reset thresholds > regular idle threshold.
+TEST_F(ConfigManagerTest, ValidateAcceptsValidResetOnIdleThresholds) {
+    auto config = ConfigManager::GetDefault();
+    config.idle.enabled = true;
+    config.idle.threshold = 180s;
+    config.idle.reset_short_on_idle = true;
+    config.idle.reset_short_threshold = 1200s;  // Greater than regular threshold
+    config.idle.reset_long_on_idle = true;
+    config.idle.reset_long_threshold = 1200s;  // Greater than regular threshold
 
     auto errors = config_manager_->Validate(config);
 
     // Should not have reset_threshold errors
     for (const auto& error : errors) {
-        EXPECT_TRUE(error.field.find("reset_threshold") == std::string::npos)
-            << "Unexpected reset_threshold error: " << error.message;
+        EXPECT_TRUE(error.field.find("reset_short_threshold") == std::string::npos &&
+                    error.field.find("reset_long_threshold") == std::string::npos)
+            << "Unexpected reset threshold error: " << error.message;
     }
 }
 
@@ -449,14 +477,17 @@ TEST_F(ConfigManagerTest, ValidateSkipsResetOnIdleWhenDisabled) {
     auto config = ConfigManager::GetDefault();
     config.idle.enabled = true;
     config.idle.threshold = 180s;
-    config.idle.reset_on_idle = false;
-    config.idle.reset_threshold = 60s;  // Invalid but should be skipped
+    config.idle.reset_short_on_idle = false;
+    config.idle.reset_short_threshold = 60s;  // Invalid but should be skipped
+    config.idle.reset_long_on_idle = false;
+    config.idle.reset_long_threshold = 60s;  // Invalid but should be skipped
 
     auto errors = config_manager_->Validate(config);
 
     // Should not have reset_threshold errors because feature is disabled
     for (const auto& error : errors) {
-        EXPECT_TRUE(error.field.find("reset_threshold") == std::string::npos)
+        EXPECT_TRUE(error.field.find("reset_short_threshold") == std::string::npos &&
+                    error.field.find("reset_long_threshold") == std::string::npos)
             << "Unexpected reset_threshold error when disabled: " << error.message;
     }
 }
@@ -468,30 +499,38 @@ TEST_F(ConfigManagerTest, ParseJsonReadsResetOnIdleConfig) {
             "enabled": true,
             "threshold_seconds": 180,
             "pause_on_idle": true,
-            "reset_on_idle": false,
-            "reset_threshold_seconds": 900
+            "reset_short_on_idle": false,
+            "reset_short_threshold_seconds": 900,
+            "reset_long_on_idle": true,
+            "reset_long_threshold_seconds": 1800
         }
     })";
 
     auto result = config_manager_->ParseJson(json);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_FALSE(result->idle.reset_on_idle);
-    EXPECT_EQ(result->idle.reset_threshold, 900s);
+    EXPECT_FALSE(result->idle.reset_short_on_idle);
+    EXPECT_EQ(result->idle.reset_short_threshold, 900s);
+    EXPECT_TRUE(result->idle.reset_long_on_idle);
+    EXPECT_EQ(result->idle.reset_long_threshold, 1800s);
 }
 
 /// @test ToJson roundtrip preserves reset-on-idle values.
 TEST_F(ConfigManagerTest, ToJsonRoundtripPreservesResetOnIdleValues) {
     auto config = ConfigManager::GetDefault();
-    config.idle.reset_on_idle = false;
-    config.idle.reset_threshold = 1800s;  // 30 minutes
+    config.idle.reset_short_on_idle = false;
+    config.idle.reset_short_threshold = 1800s;  // 30 minutes
+    config.idle.reset_long_on_idle = true;
+    config.idle.reset_long_threshold = 2400s;  // 40 minutes
 
     auto json = config_manager_->ToJson(config);
     auto result = config_manager_->ParseJson(json);
 
     ASSERT_TRUE(result.has_value());
-    EXPECT_FALSE(result->idle.reset_on_idle);
-    EXPECT_EQ(result->idle.reset_threshold, 1800s);
+    EXPECT_FALSE(result->idle.reset_short_on_idle);
+    EXPECT_EQ(result->idle.reset_short_threshold, 1800s);
+    EXPECT_TRUE(result->idle.reset_long_on_idle);
+    EXPECT_EQ(result->idle.reset_long_threshold, 2400s);
 }
 
 }  // namespace

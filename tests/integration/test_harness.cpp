@@ -25,7 +25,8 @@ void TestHarness::Initialize(const AppConfig& config) {
     simulated_time_ = DurationMs(0);
     stats_ = TestStats{};
     is_paused_by_idle_ = false;
-    reset_on_idle_triggered_ = false;
+    reset_short_on_idle_triggered_ = false;
+    reset_long_on_idle_triggered_ = false;
     break_in_progress_ = false;
 
     // Create scheduler with config
@@ -72,8 +73,10 @@ void TestHarness::InitializeWithDefaults() {
     config.idle.enabled = true;
     config.idle.threshold = Duration(5 * 60);  // 5 minutes
     config.idle.pause_on_idle = true;
-    config.idle.reset_on_idle = true;
-    config.idle.reset_threshold = Duration(20 * 60);  // 20 minutes
+    config.idle.reset_short_on_idle = true;
+    config.idle.reset_short_threshold = Duration(20 * 60);  // 20 minutes
+    config.idle.reset_long_on_idle = true;
+    config.idle.reset_long_threshold = Duration(20 * 60);  // 20 minutes
 
     // Notifications
     config.notification.enabled = true;
@@ -127,7 +130,8 @@ void TestHarness::SetupCallbacks() {
             scheduler_->Resume();
             is_paused_by_idle_ = false;
         }
-        reset_on_idle_triggered_ = false;
+        reset_short_on_idle_triggered_ = false;
+        reset_long_on_idle_triggered_ = false;
     });
 
     // DND detector callback
@@ -174,14 +178,27 @@ void TestHarness::ProcessTimerTick(DurationMs elapsed) {
         idle_detector_->AdvanceIdleTime(elapsed);
     }
 
-    if (current_config_.idle.enabled && current_config_.idle.reset_on_idle &&
-        idle_detector_->IsRunning()) {
+    if (current_config_.idle.enabled && idle_detector_->IsRunning()) {
         const auto idle_time = idle_detector_->GetIdleTime();
-        const auto reset_threshold =
-            std::chrono::duration_cast<DurationMs>(current_config_.idle.reset_threshold);
-        if (!reset_on_idle_triggered_ && idle_time >= reset_threshold) {
-            scheduler_->ResetTimers();
-            reset_on_idle_triggered_ = true;
+
+        if (current_config_.idle.reset_short_on_idle &&
+            !reset_short_on_idle_triggered_) {
+            const auto reset_short_threshold =
+                std::chrono::duration_cast<DurationMs>(current_config_.idle.reset_short_threshold);
+            if (idle_time >= reset_short_threshold) {
+                scheduler_->ResetShortTimer();
+                reset_short_on_idle_triggered_ = true;
+            }
+        }
+
+        if (current_config_.idle.reset_long_on_idle &&
+            !reset_long_on_idle_triggered_) {
+            const auto reset_long_threshold =
+                std::chrono::duration_cast<DurationMs>(current_config_.idle.reset_long_threshold);
+            if (idle_time >= reset_long_threshold) {
+                scheduler_->ResetLongTimer();
+                reset_long_on_idle_triggered_ = true;
+            }
         }
     }
 
@@ -336,7 +353,8 @@ BreakType TestHarness::GetNextBreakType() const {
 
 void TestHarness::UpdateConfig(const AppConfig& config) {
     current_config_ = config;
-    reset_on_idle_triggered_ = false;
+    reset_short_on_idle_triggered_ = false;
+    reset_long_on_idle_triggered_ = false;
 
     // Update scheduler
     scheduler_->UpdateConfig(config.short_break, config.long_break, config.overlay);

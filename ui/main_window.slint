@@ -6,9 +6,10 @@ import {
     Button,
     Palette,
     ProgressIndicator,
+    TabWidget,
 } from "std-widgets.slint";
 
-import { SettingsDialog } from "components/settings_dialog.slint";
+import { SettingsView } from "components/settings_dialog.slint";
 
 component TimerDisplay inherits Rectangle {
     in property <int> short_break_count: 0;
@@ -24,9 +25,11 @@ component TimerDisplay inherits Rectangle {
     background: Palette.alternate-background;
     border-width: 2px;
     border-color: Palette.border;
+
     VerticalLayout {
         alignment: center;
         spacing: 2px;
+
         Text {
             text: root.tracked_time;
             font-size: 20px;
@@ -46,6 +49,7 @@ component TimerDisplay inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             spacing: 12px;
+
             Text {
                 text: "Short: " + root.short_break_count;
                 font-size: 10px;
@@ -74,6 +78,7 @@ component TimerDisplay inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             spacing: 12px;
+
             Text {
                 text: "Short: " + root.short_skipped_count;
                 font-size: 10px;
@@ -102,6 +107,7 @@ component TimerDisplay inherits Rectangle {
         HorizontalLayout {
             alignment: center;
             spacing: 12px;
+
             Text {
                 text: "Short: " + root.short_idle_skipped_count;
                 font-size: 10px;
@@ -121,23 +127,19 @@ component TimerDisplay inherits Rectangle {
     }
 }
 
-export { SettingsDialog }
-
 export component MainWindow inherits Window {
     title: "BlinkBreak";
     icon: @image-url("../resources/bb_logo_blue.ico");
-    min-width: 320px;
-    min-height: 420px;
-    preferred-width: 340px;
-    preferred-height: 440px;
+    min-width: 520px;
+    min-height: 520px;
+    preferred-width: 560px;
+    preferred-height: 560px;
     background: Palette.background;
 
-    // Callbacks to C++
     callback start-clicked();
     callback pause-clicked();
-    callback settings-clicked();
+    callback settings-changed();
 
-    // Properties bound from C++
     in property <string> time-until-short: "10:00";
     in property <string> time-until-long: "30:00";
     in property <string> tracked-time: "00:00";
@@ -157,6 +159,63 @@ export component MainWindow inherits Window {
     in property <bool> theme-dark-mode: false;
     out property <string> start-button-label: root.is-running ? "Pause" : "Start";
     out property <bool> dark-theme-enabled: !root.theme-follow-system;
+    in-out property <int> current-tab: 0;
+
+    in-out property <string> short-interval-minutes: "10";
+    in-out property <string> short-duration-seconds: "20";
+    in-out property <string> long-interval-minutes: "60";
+    in-out property <string> long-duration-seconds: "300";
+    in-out property <string> snooze-duration-minutes: "5";
+    in-out property <bool> overlay-all-monitors: true;
+    in-out property <bool> overlay-opaque: false;
+    in-out property <bool> settings-theme-follow-system: true;
+    in-out property <bool> settings-theme-dark-mode: false;
+    in-out property <bool> notification-enabled: true;
+    in-out property <string> notification-warning-seconds: "30";
+    in-out property <bool> notification-respect-dnd: true;
+    in-out property <bool> notification-respect-fullscreen: false;
+    in-out property <bool> idle-enabled: true;
+    in-out property <string> idle-threshold-minutes: "3";
+    in-out property <bool> idle-pause-on-idle: true;
+    in-out property <bool> idle-show-timer: false;
+    in-out property <bool> idle-reset-short-on-idle: true;
+    in-out property <string> idle-reset-short-threshold-minutes: "20";
+    in-out property <bool> idle-reset-long-on-idle: true;
+    in-out property <string> idle-reset-long-threshold-minutes: "20";
+    in-out property <string> short-interval-error: "";
+    in-out property <string> short-duration-error: "";
+    in-out property <string> long-interval-error: "";
+    in-out property <string> long-duration-error: "";
+    in-out property <string> snooze-duration-error: "";
+    in-out property <string> notification-warning-error: "";
+    in-out property <string> idle-threshold-error: "";
+    in-out property <string> idle-reset-short-error: "";
+    in-out property <string> idle-reset-long-error: "";
+    in-out property <string> validation-error: "";
+    out property <bool> has-validation-error: root.validation-error != "";
+
+    changed short-interval-minutes => { root.settings-changed(); }
+    changed short-duration-seconds => { root.settings-changed(); }
+    changed long-interval-minutes => { root.settings-changed(); }
+    changed long-duration-seconds => { root.settings-changed(); }
+    changed snooze-duration-minutes => { root.settings-changed(); }
+    changed overlay-all-monitors => { root.settings-changed(); }
+    changed overlay-opaque => { root.settings-changed(); }
+    changed settings-theme-follow-system => { root.settings-changed(); }
+    changed settings-theme-dark-mode => { root.settings-changed(); }
+    changed notification-enabled => { root.settings-changed(); }
+    changed notification-warning-seconds => { root.settings-changed(); }
+    changed notification-respect-dnd => { root.settings-changed(); }
+    changed notification-respect-fullscreen => { root.settings-changed(); }
+    changed idle-enabled => { root.settings-changed(); }
+    changed idle-threshold-minutes => { root.settings-changed(); }
+    changed idle-pause-on-idle => { root.settings-changed(); }
+    changed idle-show-timer => { root.settings-changed(); }
+    changed idle-reset-short-on-idle => { root.settings-changed(); }
+    changed idle-reset-short-threshold-minutes => { root.settings-changed(); }
+    changed idle-reset-long-on-idle => { root.settings-changed(); }
+    changed idle-reset-long-threshold-minutes => { root.settings-changed(); }
+
     private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light);
 
     in-out property <ColorScheme> palette-color-scheme <=> Palette.color-scheme;
@@ -167,90 +226,200 @@ export component MainWindow inherits Window {
         root.palette-color-scheme = root.active-color-scheme;
     }
 
-    VerticalBox {
-        alignment: center;
-        padding: 20px;
-        spacing: 15px;
+    TabWidget {
+        current-index <=> root.current-tab;
 
-        // Status
-        Text {
-            text: root.status-text;
-            font-size: 14px;
-            horizontal-alignment: center;
-            color: Palette.foreground;
-        }
+        Tab {
+            title: "Timer";
 
-        // Timer display (short break countdown)
-        HorizontalBox {
-            alignment: center;
-            TimerDisplay {
-                tracked_time: root.tracked-time;
-                short_break_count: root.short-break-count;
-                long_break_count: root.long-break-count;
-                short_skipped_count: root.short-skipped-count;
-                long_skipped_count: root.long-skipped-count;
-                short_idle_skipped_count: root.short-idle-skipped-count;
-                long_idle_skipped_count: root.long-idle-skipped-count;
-            }
-        }
+            VerticalBox {
+                alignment: center;
+                padding: 20px;
+                spacing: 15px;
 
-        // Progress bars
-        VerticalBox {
-            width: 100%;
-            spacing: 6px;
-            Text {
-                text: "Short break in: " + root.time-until-short;
-                font-size: 10px;
-                color: Palette.foreground;
-                horizontal-alignment: left;
-            }
+                Text {
+                    text: root.status-text;
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
 
-            ProgressIndicator {
-                width: 100%;
-                height: 8px;
-                progress: root.short-progress;
-            }
+                HorizontalBox {
+                    alignment: center;
 
-            Text {
-                text: "Long break in: " + root.time-until-long;
-                font-size: 10px;
-                color: Palette.foreground;
-                horizontal-alignment: left;
-            }
+                    TimerDisplay {
+                        tracked_time: root.tracked-time;
+                        short_break_count: root.short-break-count;
+                        long_break_count: root.long-break-count;
+                        short_skipped_count: root.short-skipped-count;
+                        long_skipped_count: root.long-skipped-count;
+                        short_idle_skipped_count: root.short-idle-skipped-count;
+                        long_idle_skipped_count: root.long-idle-skipped-count;
+                    }
+                }
 
-            ProgressIndicator {
-                width: 100%;
-                height: 8px;
-                progress: root.long-progress;
-            }
+                VerticalBox {
+                    width: 100%;
+                    spacing: 6px;
 
-            if (root.show-idle-timer): Text {
-                text: "Idle time: " + root.idle-time;
-                font-size: 10px;
-                color: Palette.foreground;
-                horizontal-alignment: left;
-            }
-        }
+                    Text {
+                        text: "Short break in: " + root.time-until-short;
+                        font-size: 10px;
+                        color: Palette.foreground;
+                        horizontal-alignment: left;
+                    }
 
-        // Control buttons
-        HorizontalBox {
-            alignment: center;
-            spacing: 10px;
-            Button {
-                text: root.start-button-label;
-                clicked => {
-                    if (root.is-running) {
-                        root.pause-clicked();
-                    } else {
-                        root.start-clicked();
+                    ProgressIndicator {
+                        width: 100%;
+                        height: 8px;
+                        progress: root.short-progress;
+                    }
+
+                    Text {
+                        text: "Long break in: " + root.time-until-long;
+                        font-size: 10px;
+                        color: Palette.foreground;
+                        horizontal-alignment: left;
+                    }
+
+                    ProgressIndicator {
+                        width: 100%;
+                        height: 8px;
+                        progress: root.long-progress;
+                    }
+
+                    if (root.show-idle-timer): Text {
+                        text: "Idle time: " + root.idle-time;
+                        font-size: 10px;
+                        color: Palette.foreground;
+                        horizontal-alignment: left;
+                    }
+                }
+
+                HorizontalBox {
+                    alignment: center;
+                    spacing: 10px;
+
+                    Button {
+                        text: root.start-button-label;
+                        clicked => {
+                            if (root.is-running) {
+                                root.pause-clicked();
+                            } else {
+                                root.start-clicked();
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            Button {
-                text: "Settings";
-                clicked => {
-                    root.settings-clicked();
+        Tab {
+            title: "Settings";
+
+            settings_view := SettingsView {
+                short-interval-minutes <=> root.short-interval-minutes;
+                short-duration-seconds <=> root.short-duration-seconds;
+                long-interval-minutes <=> root.long-interval-minutes;
+                long-duration-seconds <=> root.long-duration-seconds;
+                snooze-duration-minutes <=> root.snooze-duration-minutes;
+                overlay-all-monitors <=> root.overlay-all-monitors;
+                overlay-opaque <=> root.overlay-opaque;
+                theme-follow-system <=> root.settings-theme-follow-system;
+                theme-dark-mode <=> root.settings-theme-dark-mode;
+                notification-enabled <=> root.notification-enabled;
+                notification-warning-seconds <=> root.notification-warning-seconds;
+                notification-respect-dnd <=> root.notification-respect-dnd;
+                notification-respect-fullscreen <=> root.notification-respect-fullscreen;
+                idle-enabled <=> root.idle-enabled;
+                idle-threshold-minutes <=> root.idle-threshold-minutes;
+                idle-pause-on-idle <=> root.idle-pause-on-idle;
+                idle-show-timer <=> root.idle-show-timer;
+                idle-reset-short-on-idle <=> root.idle-reset-short-on-idle;
+                idle-reset-short-threshold-minutes <=> root.idle-reset-short-threshold-minutes;
+                idle-reset-long-on-idle <=> root.idle-reset-long-on-idle;
+                idle-reset-long-threshold-minutes <=> root.idle-reset-long-threshold-minutes;
+                short-interval-error <=> root.short-interval-error;
+                short-duration-error <=> root.short-duration-error;
+                long-interval-error <=> root.long-interval-error;
+                long-duration-error <=> root.long-duration-error;
+                snooze-duration-error <=> root.snooze-duration-error;
+                notification-warning-error <=> root.notification-warning-error;
+                idle-threshold-error <=> root.idle-threshold-error;
+                idle-reset-short-error <=> root.idle-reset-short-error;
+                idle-reset-long-error <=> root.idle-reset-long-error;
+                validation-error <=> root.validation-error;
+
+                settings-changed => {
+                    root.settings-changed();
+                }
+            }
+        }
+
+        Tab {
+            title: "About";
+
+            VerticalBox {
+                alignment: center;
+                padding: 24px;
+                spacing: 14px;
+
+                Text {
+                    text: "BlinkBreak";
+                    font-size: 24px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "Version 0.1.0";
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "2026";
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "Author: @nurgalive";
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "GitHub: github.com/nurgalive";
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                    color: Palette.accent-background;
+                }
+
+                Text {
+                    text: "Questions and issues: blinkbreak@nurgalive.com";
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "A desktop break companion for healthier screen habits.";
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                }
+
+                Text {
+                    text: "Features: break timers, idle awareness, notifications, multi-monitor overlays, and tray control.";
+                    font-size: 12px;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
                 }
             }
         }

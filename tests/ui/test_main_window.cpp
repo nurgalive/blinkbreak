@@ -57,22 +57,6 @@ TEST(MainWindowUiTest, PauseClickedInvokesCallback)
   EXPECT_EQ(pause_spy.count, 1);
 }
 
-/// @test Verifies settings callback is invoked.
-/// @details Ensures that `settings-clicked` fires and the callback spy records
-/// a single invocation.
-TEST(MainWindowUiTest, SettingsCallbackInvokes)
-{
-  auto window = MainWindow::create();
-
-  CallbackSpy settings_spy;
-
-  window->on_settings_clicked([&settings_spy]() { settings_spy(); });
-
-  window->invoke_settings_clicked();
-
-  EXPECT_EQ(settings_spy.count, 1);
-}
-
 /// @test Verifies property round-trips for main window state.
 /// @details Sets multiple properties (time strings, status, progress, counts,
 /// tracked time, and skipped counts) and verifies getters return identical values.

@@ -88,7 +88,8 @@ AppController::AppController()
       show_idle_timer_(false),
       idle_time_("00:00"),
       reset_short_on_idle_triggered_(false),
-      reset_long_on_idle_triggered_(false)
+      reset_long_on_idle_triggered_(false),
+      suppress_settings_events_(false)
 {
   spdlog::debug("AppController created");
 }
@@ -392,7 +393,7 @@ bool AppController::Initialize()
 
   ui->on_start_clicked([this] { OnStart(); });
   ui->on_pause_clicked([this] { OnPause(); });
-  ui->on_settings_clicked([this] { OnOpenSettings(); });
+  ui->on_settings_changed([this] { OnSaveSettings(); });
 
   // Handle window close - hide to tray instead of minimizing/quitting.
   // Use Slint's hide path so the renderer can repaint correctly on restore.
@@ -419,6 +420,7 @@ bool AppController::Initialize()
   ui->set_show_idle_timer(show_idle_timer_);
   ui->set_idle_time(slint::SharedString(idle_time_));
   ApplyThemeProperties(*main_window_, config_.theme);
+  PopulateSettingsTab();
 
   if (config_.notification.enabled)
   {
@@ -722,338 +724,358 @@ void AppController::OnReset()
 void AppController::OnOpenSettings()
 {
   spdlog::debug("OnOpenSettings called");
-
-  if (!settings_dialog_)
+  if (!main_window_)
   {
-    settings_dialog_ =
-        std::make_unique<slint::ComponentHandle<SettingsDialog>>(SettingsDialog::create());
-    auto& dialog = *settings_dialog_;
-
-    dialog->on_cancel_clicked(
-        [this]
-        {
-          if (settings_dialog_)
-          {
-            (*settings_dialog_)->hide();
-            slint::invoke_from_event_loop(
-                [this]()
-                {
-                  if (settings_dialog_)
-                  {
-                    settings_dialog_.reset();
-                  }
-                });
-          }
-        });
-
-    // Handle settings window close button (X)
-    dialog->window().on_close_requested(
-        [this]()
-        {
-          spdlog::debug("Settings close requested - destroying");
-
-          slint::invoke_from_event_loop(
-              [this]()
-              {
-                if (settings_dialog_)
-                {
-                  settings_dialog_.reset();
-                }
-              });
-
-          return slint::CloseRequestResponse::HideWindow;
-        });
-
-    dialog->on_save_clicked(
-        [this]
-        {
-          if (!settings_dialog_)
-          {
-            return;
-          }
-
-          auto& dialog = *settings_dialog_;
-          dialog->set_validation_error(slint::SharedString(""));
-
-          const auto short_interval_text = ToStdString(dialog->get_short_interval_minutes());
-          const auto short_duration_text = ToStdString(dialog->get_short_duration_seconds());
-          const auto long_interval_text = ToStdString(dialog->get_long_interval_minutes());
-          const auto long_duration_text = ToStdString(dialog->get_long_duration_seconds());
-          const auto snooze_duration_text = ToStdString(dialog->get_snooze_duration_minutes());
-          const auto idle_threshold_text = ToStdString(dialog->get_idle_threshold_minutes());
-          const auto reset_short_threshold_text =
-              ToStdString(dialog->get_idle_reset_short_threshold_minutes());
-          const auto reset_long_threshold_text =
-              ToStdString(dialog->get_idle_reset_long_threshold_minutes());
-          const auto notification_warning_text =
-              ToStdString(dialog->get_notification_warning_seconds());
-
-          const auto short_interval_minutes = ParsePositiveInt(short_interval_text);
-          const auto short_duration_seconds = ParsePositiveInt(short_duration_text);
-          const auto long_interval_minutes = ParsePositiveInt(long_interval_text);
-          const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
-          const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
-          const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
-          const auto reset_short_threshold_minutes = ParsePositiveInt(reset_short_threshold_text);
-          const auto reset_long_threshold_minutes = ParsePositiveInt(reset_long_threshold_text);
-          const auto notification_warning_seconds = ParsePositiveInt(notification_warning_text);
-
-          if (!short_interval_minutes || !short_duration_seconds || !long_interval_minutes ||
-              !long_duration_seconds || !snooze_duration_minutes || !idle_threshold_minutes ||
-              !reset_short_threshold_minutes || !reset_long_threshold_minutes ||
-              !notification_warning_seconds)
-          {
-            dialog->set_validation_error(
-                slint::SharedString("All fields must be positive integers."));
-            return;
-          }
-          if (*notification_warning_seconds < 5 || *notification_warning_seconds > 300)
-          {
-            dialog->set_validation_error(
-                slint::SharedString("Warning time must be between 5 and 300 seconds."));
-            return;
-          }
-
-          AppConfig updated{};
-          {
-            std::lock_guard lock(mutex_);
-            updated = config_;
-          }
-          updated.short_break.interval = Duration(*short_interval_minutes * 60);
-          updated.short_break.duration = Duration(*short_duration_seconds);
-          updated.long_break.interval = Duration(*long_interval_minutes * 60);
-          updated.long_break.duration = Duration(*long_duration_seconds);
-          updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
-          updated.overlay.show_on_all_monitors = dialog->get_overlay_all_monitors();
-          updated.overlay.opacity = dialog->get_overlay_opaque() ? 1.0f : 0.7f;
-          updated.theme.follow_system = dialog->get_theme_follow_system();
-          updated.theme.dark_mode = dialog->get_theme_dark_mode();
-
-          // Update notification config
-          updated.notification.enabled = dialog->get_notification_enabled();
-          updated.notification.warning_time = Duration(*notification_warning_seconds);
-          updated.notification.respect_dnd = dialog->get_notification_respect_dnd();
-          updated.notification.respect_fullscreen = dialog->get_notification_respect_fullscreen();
-
-          // Update idle config
-          updated.idle.enabled = dialog->get_idle_enabled();
-          updated.idle.threshold = Duration(*idle_threshold_minutes * 60);
-          updated.idle.pause_on_idle = dialog->get_idle_pause_on_idle();
-          updated.idle.show_timer = dialog->get_idle_show_timer();
-          updated.idle.reset_short_on_idle = dialog->get_idle_reset_short_on_idle();
-          updated.idle.reset_short_threshold = Duration(*reset_short_threshold_minutes * 60);
-          updated.idle.reset_long_on_idle = dialog->get_idle_reset_long_on_idle();
-          updated.idle.reset_long_threshold = Duration(*reset_long_threshold_minutes * 60);
-
-          auto errors = config_manager_->Validate(updated);
-          if (!errors.empty())
-          {
-            dialog->set_validation_error(slint::SharedString(errors[0].message));
-            return;
-          }
-
-          if (config_manager_)
-          {
-            auto save_result = config_manager_->Save(updated, config_path_);
-            if (!save_result)
-            {
-              dialog->set_validation_error(slint::SharedString(save_result.error().message));
-              return;
-            }
-          }
-
-          {
-            std::lock_guard lock(mutex_);
-            config_ = updated;
-          }
-          spdlog::info(
-              "Updated notification config: enabled={}, warning_time={}s, respect_dnd={}, "
-              "respect_fullscreen={}",
-              updated.notification.enabled, updated.notification.warning_time.count(),
-              updated.notification.respect_dnd, updated.notification.respect_fullscreen);
-          EnsureDndDetectorState(updated.notification.respect_dnd ||
-                                 updated.notification.respect_fullscreen);
-          if (updated.notification.enabled)
-          {
-            static_cast<void>(EnsureNotificationManagerInitialized());
-          }
-          if (!updated.notification.enabled && notification_manager_)
-          {
-            int64_t toast_id = -1;
-            {
-              std::lock_guard lock(mutex_);
-              toast_id = active_toast_id_;
-              active_toast_id_ = -1;
-            }
-            if (toast_id >= 0)
-            {
-              notification_manager_->Hide(toast_id);
-            }
-          }
-          bool scheduler_running = false;
-          {
-            std::lock_guard scheduler_lock(scheduler_mutex_);
-            if (scheduler_)
-            {
-              scheduler_->UpdateConfig(updated.short_break, updated.long_break, updated.overlay);
-              const auto warning_time = updated.notification.enabled
-                                            ? updated.notification.warning_time
-                                            : Duration::zero();
-              scheduler_->SetOnWarning(
-                  [this](BreakType type, Duration time_until)
-                  {
-                    spdlog::info("Warning: {} break in {}s", BreakTypeToString(type),
-                                 time_until.count());
-                    if (tray_manager_)
-                    {
-                      tray_manager_->UpdateStatus(is_running_, time_until, type);
-                    }
-                    slint::invoke_from_event_loop(
-
-                        [this, type, time_until]() { ShowPreBreakNotification(type, time_until); });
-                  },
-                  warning_time);
-              scheduler_running = scheduler_->IsRunning();
-            }
-          }
-          if (!scheduler_running)
-          {
-            std::lock_guard lock(mutex_);
-            time_until_short_ = FormatDuration(updated.short_break.interval);
-            time_until_long_ = FormatDuration(updated.long_break.interval);
-            short_progress_ = 0.0f;
-            long_progress_ = 0.0f;
-            status_text_ = "Ready - Click Start";
-          }
-
-          BreakType next_break_type = BreakType::kShort;
-          {
-            std::lock_guard scheduler_lock(scheduler_mutex_);
-            if (scheduler_)
-            {
-              next_break_type = scheduler_->GetNextBreakType();
-            }
-          }
-
-          bool is_running_snapshot = false;
-          {
-            std::lock_guard lock(mutex_);
-            is_running_snapshot = is_running_;
-          }
-          if (tray_manager_)
-          {
-            tray_manager_->UpdateStatus(is_running_snapshot, updated.short_break.interval,
-                                        next_break_type);
-          }
-          if (overlay_manager_)
-          {
-            overlay_manager_->UpdateOpacity(updated.overlay.opacity);
-            overlay_manager_->UpdateActions(updated.overlay.allow_skip,
-                                            updated.overlay.allow_snooze);
-            overlay_manager_->SetShowOnAllMonitors(updated.overlay.show_on_all_monitors);
-          }
-
-          ApplyThemeToMainWindow();
-          ApplyThemeToSettingsDialog();
-
-          // Update idle detector settings
-          if (updated.idle.enabled)
-          {
-            if (!idle_detector_)
-            {
-              // Create idle detector if it didn't exist
-              idle_detector_ = platform::CreateIdleDetector();
-              if (idle_detector_)
-              {
-                idle_detector_->SetOnIdle([this]() { OnUserIdle(); });
-                idle_detector_->SetOnActive([this]() { OnUserActive(); });
-              }
-            }
-            if (idle_detector_)
-            {
-              idle_detector_->SetIdleThreshold(
-                  std::chrono::duration_cast<std::chrono::seconds>(updated.idle.threshold));
-              if (!idle_detector_->IsRunning())
-              {
-                idle_detector_->Start();
-              }
-              spdlog::info(
-                  "Idle detection updated: threshold={}s, pause={}, reset_short={}, "
-                  "reset_long={}, show_timer={}",
-                  updated.idle.threshold.count(), updated.idle.pause_on_idle,
-                  updated.idle.reset_short_on_idle, updated.idle.reset_long_on_idle,
-                  updated.idle.show_timer);
-            }
-          }
-          else
-          {
-            // Disable idle detection
-            if (idle_detector_ && idle_detector_->IsRunning())
-            {
-              idle_detector_->Stop();
-              spdlog::info("Idle detection disabled");
-            }
-          }
-
-          UpdateUI();
-
-          (*settings_dialog_)->hide();
-          slint::invoke_from_event_loop(
-              [this]()
-              {
-                if (settings_dialog_)
-                {
-                  settings_dialog_.reset();
-                }
-              });
-        });
+    return;
   }
 
-  auto& dialog = *settings_dialog_;
+  PopulateSettingsTab();
+  (*main_window_)->set_current_tab(1);
+}
+
+void AppController::PopulateSettingsTab()
+{
+  if (!main_window_)
+  {
+    return;
+  }
+
   AppConfig snapshot{};
   {
     std::lock_guard lock(mutex_);
     snapshot = config_;
   }
-  dialog->set_short_interval_minutes(slint::SharedString(
+
+  suppress_settings_events_ = true;
+  auto& window = *main_window_;
+  window->set_short_interval_minutes(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.short_break.interval.count() / 60))));
-  dialog->set_short_duration_seconds(
+  window->set_short_duration_seconds(
       slint::SharedString(std::to_string(static_cast<int>(snapshot.short_break.duration.count()))));
-  dialog->set_long_interval_minutes(slint::SharedString(
+  window->set_long_interval_minutes(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.long_break.interval.count() / 60))));
-  dialog->set_long_duration_seconds(
+  window->set_long_duration_seconds(
       slint::SharedString(std::to_string(static_cast<int>(snapshot.long_break.duration.count()))));
-  dialog->set_snooze_duration_minutes(slint::SharedString(
+  window->set_snooze_duration_minutes(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.overlay.snooze_duration.count() / 60))));
-  dialog->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
-  dialog->set_overlay_opaque(snapshot.overlay.opacity > 0.8f);
-  dialog->set_theme_follow_system(snapshot.theme.follow_system);
-  dialog->set_theme_dark_mode(snapshot.theme.dark_mode);
-
-  // Bind notification settings
-  dialog->set_notification_enabled(snapshot.notification.enabled);
-  dialog->set_notification_warning_seconds(slint::SharedString(
+  window->set_overlay_all_monitors(snapshot.overlay.show_on_all_monitors);
+  window->set_overlay_opaque(snapshot.overlay.opacity > 0.8f);
+  window->set_settings_theme_follow_system(snapshot.theme.follow_system);
+  window->set_settings_theme_dark_mode(snapshot.theme.dark_mode);
+  window->set_notification_enabled(snapshot.notification.enabled);
+  window->set_notification_warning_seconds(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.notification.warning_time.count()))));
-  dialog->set_notification_respect_dnd(snapshot.notification.respect_dnd);
-  dialog->set_notification_respect_fullscreen(snapshot.notification.respect_fullscreen);
-
-  // Bind idle settings
-  dialog->set_idle_enabled(snapshot.idle.enabled);
-  dialog->set_idle_threshold_minutes(
+  window->set_notification_respect_dnd(snapshot.notification.respect_dnd);
+  window->set_notification_respect_fullscreen(snapshot.notification.respect_fullscreen);
+  window->set_idle_enabled(snapshot.idle.enabled);
+  window->set_idle_threshold_minutes(
       slint::SharedString(std::to_string(static_cast<int>(snapshot.idle.threshold.count() / 60))));
-  dialog->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
-  dialog->set_idle_show_timer(snapshot.idle.show_timer);
-  dialog->set_idle_reset_short_on_idle(snapshot.idle.reset_short_on_idle);
-  dialog->set_idle_reset_short_threshold_minutes(slint::SharedString(
+  window->set_idle_pause_on_idle(snapshot.idle.pause_on_idle);
+  window->set_idle_show_timer(snapshot.idle.show_timer);
+  window->set_idle_reset_short_on_idle(snapshot.idle.reset_short_on_idle);
+  window->set_idle_reset_short_threshold_minutes(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.idle.reset_short_threshold.count() / 60))));
-  dialog->set_idle_reset_long_on_idle(snapshot.idle.reset_long_on_idle);
-  dialog->set_idle_reset_long_threshold_minutes(slint::SharedString(
+  window->set_idle_reset_long_on_idle(snapshot.idle.reset_long_on_idle);
+  window->set_idle_reset_long_threshold_minutes(slint::SharedString(
       std::to_string(static_cast<int>(snapshot.idle.reset_long_threshold.count() / 60))));
+  window->set_validation_error(slint::SharedString(""));
+  window->set_short_interval_error(slint::SharedString(""));
+  window->set_short_duration_error(slint::SharedString(""));
+  window->set_long_interval_error(slint::SharedString(""));
+  window->set_long_duration_error(slint::SharedString(""));
+  window->set_snooze_duration_error(slint::SharedString(""));
+  window->set_notification_warning_error(slint::SharedString(""));
+  window->set_idle_threshold_error(slint::SharedString(""));
+  window->set_idle_reset_short_error(slint::SharedString(""));
+  window->set_idle_reset_long_error(slint::SharedString(""));
+  suppress_settings_events_ = false;
+}
 
-  dialog->set_validation_error(slint::SharedString(""));
-  ApplyThemeToSettingsDialog();
+void AppController::OnSaveSettings()
+{
+  if (suppress_settings_events_ || !main_window_)
+  {
+    return;
+  }
 
-  dialog->show();
+  auto& window = *main_window_;
+  window->set_validation_error(slint::SharedString(""));
+  window->set_short_interval_error(slint::SharedString(""));
+  window->set_short_duration_error(slint::SharedString(""));
+  window->set_long_interval_error(slint::SharedString(""));
+  window->set_long_duration_error(slint::SharedString(""));
+  window->set_snooze_duration_error(slint::SharedString(""));
+  window->set_notification_warning_error(slint::SharedString(""));
+  window->set_idle_threshold_error(slint::SharedString(""));
+  window->set_idle_reset_short_error(slint::SharedString(""));
+  window->set_idle_reset_long_error(slint::SharedString(""));
+
+  const auto short_interval_text = ToStdString(window->get_short_interval_minutes());
+  const auto short_duration_text = ToStdString(window->get_short_duration_seconds());
+  const auto long_interval_text = ToStdString(window->get_long_interval_minutes());
+  const auto long_duration_text = ToStdString(window->get_long_duration_seconds());
+  const auto snooze_duration_text = ToStdString(window->get_snooze_duration_minutes());
+  const auto idle_threshold_text = ToStdString(window->get_idle_threshold_minutes());
+  const auto reset_short_threshold_text =
+      ToStdString(window->get_idle_reset_short_threshold_minutes());
+  const auto reset_long_threshold_text =
+      ToStdString(window->get_idle_reset_long_threshold_minutes());
+  const auto notification_warning_text = ToStdString(window->get_notification_warning_seconds());
+
+  const auto short_interval_minutes = ParsePositiveInt(short_interval_text);
+  const auto short_duration_seconds = ParsePositiveInt(short_duration_text);
+  const auto long_interval_minutes = ParsePositiveInt(long_interval_text);
+  const auto long_duration_seconds = ParsePositiveInt(long_duration_text);
+  const auto snooze_duration_minutes = ParsePositiveInt(snooze_duration_text);
+  const auto idle_threshold_minutes = ParsePositiveInt(idle_threshold_text);
+  const auto reset_short_threshold_minutes = ParsePositiveInt(reset_short_threshold_text);
+  const auto reset_long_threshold_minutes = ParsePositiveInt(reset_long_threshold_text);
+  const auto notification_warning_seconds = ParsePositiveInt(notification_warning_text);
+
+  bool has_parse_error = false;
+  auto check_parse = [&](std::optional<int> val, auto setter)
+  {
+    if (!val)
+    {
+      setter(slint::SharedString("Must be a positive integer."));
+      has_parse_error = true;
+    }
+  };
+
+  check_parse(short_interval_minutes, [&](auto s) { window->set_short_interval_error(s); });
+  check_parse(short_duration_seconds, [&](auto s) { window->set_short_duration_error(s); });
+  check_parse(long_interval_minutes, [&](auto s) { window->set_long_interval_error(s); });
+  check_parse(long_duration_seconds, [&](auto s) { window->set_long_duration_error(s); });
+  check_parse(snooze_duration_minutes, [&](auto s) { window->set_snooze_duration_error(s); });
+  check_parse(idle_threshold_minutes, [&](auto s) { window->set_idle_threshold_error(s); });
+  check_parse(reset_short_threshold_minutes,
+              [&](auto s) { window->set_idle_reset_short_error(s); });
+  check_parse(reset_long_threshold_minutes, [&](auto s) { window->set_idle_reset_long_error(s); });
+  check_parse(notification_warning_seconds,
+              [&](auto s) { window->set_notification_warning_error(s); });
+
+  if (has_parse_error)
+  {
+    return;
+  }
+
+  if (*notification_warning_seconds < 5 || *notification_warning_seconds > 300)
+  {
+    window->set_notification_warning_error(
+        slint::SharedString("Warning time must be between 5 and 300 seconds."));
+    return;
+  }
+
+  AppConfig updated{};
+  {
+    std::lock_guard lock(mutex_);
+    updated = config_;
+  }
+  updated.short_break.interval = Duration(*short_interval_minutes * 60);
+  updated.short_break.duration = Duration(*short_duration_seconds);
+  updated.long_break.interval = Duration(*long_interval_minutes * 60);
+  updated.long_break.duration = Duration(*long_duration_seconds);
+  updated.overlay.snooze_duration = Duration(*snooze_duration_minutes * 60);
+  updated.overlay.show_on_all_monitors = window->get_overlay_all_monitors();
+  updated.overlay.opacity = window->get_overlay_opaque() ? 1.0f : 0.7f;
+  updated.theme.follow_system = window->get_settings_theme_follow_system();
+  updated.theme.dark_mode = window->get_settings_theme_dark_mode();
+  updated.notification.enabled = window->get_notification_enabled();
+  updated.notification.warning_time = Duration(*notification_warning_seconds);
+  updated.notification.respect_dnd = window->get_notification_respect_dnd();
+  updated.notification.respect_fullscreen = window->get_notification_respect_fullscreen();
+  updated.idle.enabled = window->get_idle_enabled();
+  updated.idle.threshold = Duration(*idle_threshold_minutes * 60);
+  updated.idle.pause_on_idle = window->get_idle_pause_on_idle();
+  updated.idle.show_timer = window->get_idle_show_timer();
+  updated.idle.reset_short_on_idle = window->get_idle_reset_short_on_idle();
+  updated.idle.reset_short_threshold = Duration(*reset_short_threshold_minutes * 60);
+  updated.idle.reset_long_on_idle = window->get_idle_reset_long_on_idle();
+  updated.idle.reset_long_threshold = Duration(*reset_long_threshold_minutes * 60);
+
+  auto errors = config_manager_->Validate(updated);
+  if (!errors.empty())
+  {
+    const auto& error = errors[0];
+    if (error.field == "short_break.interval")
+    {
+      window->set_short_interval_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "short_break.duration")
+    {
+      window->set_short_duration_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "long_break.interval")
+    {
+      window->set_long_interval_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "long_break.duration")
+    {
+      window->set_long_duration_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "overlay.snooze_duration")
+    {
+      window->set_snooze_duration_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "notification.warning_time")
+    {
+      window->set_notification_warning_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "idle.threshold")
+    {
+      window->set_idle_threshold_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "idle.reset_short_threshold")
+    {
+      window->set_idle_reset_short_error(slint::SharedString(error.message));
+    }
+    else if (error.field == "idle.reset_long_threshold")
+    {
+      window->set_idle_reset_long_error(slint::SharedString(error.message));
+    }
+    else
+    {
+      window->set_validation_error(slint::SharedString(error.message));
+    }
+    return;
+  }
+
+  if (config_manager_)
+  {
+    auto save_result = config_manager_->Save(updated, config_path_);
+    if (!save_result)
+    {
+      window->set_validation_error(slint::SharedString(save_result.error().message));
+      return;
+    }
+  }
+
+  {
+    std::lock_guard lock(mutex_);
+    config_ = updated;
+  }
+
+  spdlog::info(
+      "Updated notification config: enabled={}, warning_time={}s, respect_dnd={}, "
+      "respect_fullscreen={}",
+      updated.notification.enabled, updated.notification.warning_time.count(),
+      updated.notification.respect_dnd, updated.notification.respect_fullscreen);
+
+  EnsureDndDetectorState(updated.notification.respect_dnd ||
+                         updated.notification.respect_fullscreen);
+  if (updated.notification.enabled)
+  {
+    static_cast<void>(EnsureNotificationManagerInitialized());
+  }
+  if (!updated.notification.enabled && notification_manager_)
+  {
+    int64_t toast_id = -1;
+    {
+      std::lock_guard lock(mutex_);
+      toast_id = active_toast_id_;
+      active_toast_id_ = -1;
+    }
+    if (toast_id >= 0)
+    {
+      notification_manager_->Hide(toast_id);
+    }
+  }
+
+  bool scheduler_running = false;
+  {
+    std::lock_guard scheduler_lock(scheduler_mutex_);
+    if (scheduler_)
+    {
+      scheduler_->UpdateConfig(updated.short_break, updated.long_break, updated.overlay);
+      const auto warning_time =
+          updated.notification.enabled ? updated.notification.warning_time : Duration::zero();
+      scheduler_->SetOnWarning(
+          [this](BreakType type, Duration time_until)
+          {
+            spdlog::info("Warning: {} break in {}s", BreakTypeToString(type), time_until.count());
+            if (tray_manager_)
+            {
+              tray_manager_->UpdateStatus(is_running_, time_until, type);
+            }
+            slint::invoke_from_event_loop([this, type, time_until]()
+                                          { ShowPreBreakNotification(type, time_until); });
+          },
+          warning_time);
+      scheduler_running = scheduler_->IsRunning();
+    }
+  }
+
+  if (!scheduler_running)
+  {
+    std::lock_guard lock(mutex_);
+    time_until_short_ = FormatDuration(updated.short_break.interval);
+    time_until_long_ = FormatDuration(updated.long_break.interval);
+    short_progress_ = 0.0f;
+    long_progress_ = 0.0f;
+    status_text_ = "Ready - Click Start";
+  }
+
+  BreakType next_break_type = BreakType::kShort;
+  {
+    std::lock_guard scheduler_lock(scheduler_mutex_);
+    if (scheduler_)
+    {
+      next_break_type = scheduler_->GetNextBreakType();
+    }
+  }
+
+  bool is_running_snapshot = false;
+  {
+    std::lock_guard lock(mutex_);
+    is_running_snapshot = is_running_;
+  }
+  if (tray_manager_)
+  {
+    tray_manager_->UpdateStatus(is_running_snapshot, updated.short_break.interval, next_break_type);
+  }
+  if (overlay_manager_)
+  {
+    overlay_manager_->UpdateOpacity(updated.overlay.opacity);
+    overlay_manager_->UpdateActions(updated.overlay.allow_skip, updated.overlay.allow_snooze);
+    overlay_manager_->SetShowOnAllMonitors(updated.overlay.show_on_all_monitors);
+  }
+
+  ApplyThemeToMainWindow();
+
+  if (updated.idle.enabled)
+  {
+    if (!idle_detector_)
+    {
+      idle_detector_ = platform::CreateIdleDetector();
+      if (idle_detector_)
+      {
+        idle_detector_->SetOnIdle([this]() { OnUserIdle(); });
+        idle_detector_->SetOnActive([this]() { OnUserActive(); });
+      }
+    }
+    if (idle_detector_)
+    {
+      idle_detector_->SetIdleThreshold(
+          std::chrono::duration_cast<std::chrono::seconds>(updated.idle.threshold));
+      if (!idle_detector_->IsRunning())
+      {
+        idle_detector_->Start();
+      }
+      spdlog::info(
+          "Idle detection updated: threshold={}s, pause={}, reset_short={}, reset_long={}, "
+          "show_timer={}",
+          updated.idle.threshold.count(), updated.idle.pause_on_idle,
+          updated.idle.reset_short_on_idle, updated.idle.reset_long_on_idle,
+          updated.idle.show_timer);
+    }
+  }
+  else if (idle_detector_ && idle_detector_->IsRunning())
+  {
+    idle_detector_->Stop();
+    spdlog::info("Idle detection disabled");
+  }
+
+  UpdateUI();
 }
 
 void AppController::OnQuit()
@@ -1722,22 +1744,6 @@ void AppController::ApplyThemeToMainWindow()
   }
 
   ApplyThemeProperties(*main_window_, theme);
-}
-
-void AppController::ApplyThemeToSettingsDialog()
-{
-  if (!settings_dialog_)
-  {
-    return;
-  }
-
-  ThemeConfig theme;
-  {
-    std::lock_guard lock(mutex_);
-    theme = config_.theme;
-  }
-
-  ApplyThemeProperties(*settings_dialog_, theme);
 }
 
 }  // namespace blinkbreak

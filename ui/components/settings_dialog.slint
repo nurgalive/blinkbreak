@@ -1,10 +1,8 @@
-// Settings dialog component for BlinkBreak.
-// Exposes basic break timing fields (intervals and durations).
+// Embedded settings view for BlinkBreak.
 
 import {
     VerticalBox,
     HorizontalBox,
-    Button,
     LineEdit,
     Palette,
     ScrollView,
@@ -15,48 +13,55 @@ component NumberFieldRow inherits Rectangle {
     in property <string> label: "";
     in property <string> unit: "";
     in-out property <string> value: "";
+    in property <string> error: "";
 
-    height: 32px;
+    height: root.error != "" ? 52px : 32px;
 
-    HorizontalBox {
-        spacing: 8px;
+    VerticalBox {
+        padding: 0;
+        spacing: 4px;
         alignment: start;
 
-        Text {
-            text: root.label;
-            width: 280px;
-            vertical-alignment: center;
-            font-size: 12px;
-            color: Palette.foreground;
+        HorizontalBox {
+            padding: 0;
+            spacing: 8px;
+            alignment: start;
+            height: 32px;
+
+            Text {
+                text: root.label;
+                width: 280px;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: Palette.foreground;
+            }
+
+            LineEdit {
+                width: 80px;
+                text <=> root.value;
+            }
+
+            Text {
+                text: root.unit;
+                vertical-alignment: center;
+                font-size: 12px;
+                color: Palette.foreground;
+            }
         }
 
-        LineEdit {
-            width: 80px;
-            text <=> root.value;
-        }
-
-        Text {
-            text: root.unit;
-            vertical-alignment: center;
+        if root.error != "": Text {
+            text: root.error;
             font-size: 12px;
-            color: Palette.foreground;
+            color: #d32f2f;
         }
     }
 }
 
-export component SettingsDialog inherits Window {
-    title: "Settings";
-    min-width: 500px;
-    min-height: 380px;
-    preferred-width: 520px;
-    preferred-height: 380px;
+export component SettingsView inherits Rectangle {
     background: Palette.background;
 
-    callback save-clicked();
-    callback cancel-clicked();
+    callback settings-changed();
 
-    // Editable values as strings for easy binding to LineEdit.
-    // Intervals are in minutes; durations are in seconds.
     in-out property <string> short-interval-minutes: "10";
     in-out property <string> short-duration-seconds: "20";
     in-out property <string> long-interval-minutes: "60";
@@ -67,25 +72,31 @@ export component SettingsDialog inherits Window {
     in-out property <bool> theme-follow-system: true;
     in-out property <bool> theme-dark-mode: false;
 
-    // Notification settings
     in-out property <bool> notification-enabled: true;
     in-out property <string> notification-warning-seconds: "30";
     in-out property <bool> notification-respect-dnd: true;
     in-out property <bool> notification-respect-fullscreen: false;
 
-    // Idle detection settings
     in-out property <bool> idle-enabled: true;
     in-out property <string> idle-threshold-minutes: "3";
     in-out property <bool> idle-pause-on-idle: true;
     in-out property <bool> idle-show-timer: false;
-
-    // Reset breaks on idle settings
     in-out property <bool> idle-reset-short-on-idle: true;
     in-out property <string> idle-reset-short-threshold-minutes: "20";
     in-out property <bool> idle-reset-long-on-idle: true;
     in-out property <string> idle-reset-long-threshold-minutes: "20";
 
+    in-out property <string> short-interval-error: "";
+    in-out property <string> short-duration-error: "";
+    in-out property <string> long-interval-error: "";
+    in-out property <string> long-duration-error: "";
+    in-out property <string> snooze-duration-error: "";
+    in-out property <string> notification-warning-error: "";
+    in-out property <string> idle-threshold-error: "";
+    in-out property <string> idle-reset-short-error: "";
+    in-out property <string> idle-reset-long-error: "";
     in-out property <string> validation-error: "";
+
     out property <bool> has-validation-error: root.validation-error != "";
     out property <bool> dark-mode-enabled: !root.theme-follow-system;
     private property <ColorScheme> active-color-scheme: root.theme-follow-system ? ColorScheme.unknown : (root.theme-dark-mode ? ColorScheme.dark : ColorScheme.light);
@@ -124,12 +135,14 @@ export component SettingsDialog inherits Window {
                     label: "Interval";
                     unit: "minutes";
                     value <=> root.short-interval-minutes;
+                    error: root.short-interval-error;
                 }
 
                 NumberFieldRow {
                     label: "Duration";
                     unit: "seconds";
                     value <=> root.short-duration-seconds;
+                    error: root.short-duration-error;
                 }
 
                 Text {
@@ -143,12 +156,14 @@ export component SettingsDialog inherits Window {
                     label: "Interval";
                     unit: "minutes";
                     value <=> root.long-interval-minutes;
+                    error: root.long-interval-error;
                 }
 
                 NumberFieldRow {
                     label: "Duration";
                     unit: "seconds";
                     value <=> root.long-duration-seconds;
+                    error: root.long-duration-error;
                 }
 
                 Text {
@@ -162,6 +177,7 @@ export component SettingsDialog inherits Window {
                     label: "Snooze";
                     unit: "minutes";
                     value <=> root.snooze-duration-minutes;
+                    error: root.snooze-duration-error;
                 }
 
                 HorizontalBox {
@@ -268,6 +284,7 @@ export component SettingsDialog inherits Window {
                     label: "Warning time";
                     unit: "seconds";
                     value <=> root.notification-warning-seconds;
+                    error: root.notification-warning-error;
                 }
 
                 HorizontalBox {
@@ -332,6 +349,7 @@ export component SettingsDialog inherits Window {
                     label: "Idle threshold";
                     unit: "minutes";
                     value <=> root.idle-threshold-minutes;
+                    error: root.idle-threshold-error;
                 }
 
                 HorizontalBox {
@@ -389,6 +407,7 @@ export component SettingsDialog inherits Window {
                     label: "Reset short break on idle threshold";
                     unit: "minutes";
                     value <=> root.idle-reset-short-threshold-minutes;
+                    error: root.idle-reset-short-error;
                 }
 
                 HorizontalBox {
@@ -412,31 +431,13 @@ export component SettingsDialog inherits Window {
                     label: "Reset long break on idle threshold";
                     unit: "minutes";
                     value <=> root.idle-reset-long-threshold-minutes;
+                    error: root.idle-reset-long-error;
                 }
 
                 if root.validation-error != "": Text {
                     text: root.validation-error;
                     font-size: 12px;
                     color: #d32f2f;
-                }
-            }
-        }
-
-        HorizontalBox {
-            spacing: 8px;
-            alignment: end;
-
-            Button {
-                text: "Cancel";
-                clicked => {
-                    root.cancel-clicked();
-                }
-            }
-
-            Button {
-                text: "Save";
-                clicked => {
-                    root.save-clicked();
                 }
             }
         }

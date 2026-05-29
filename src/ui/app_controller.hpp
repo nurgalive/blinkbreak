@@ -32,8 +32,6 @@ class ComponentWeakHandle;
 }  // namespace slint
 
 class MainWindow;
-class SettingsDialog;
-
 namespace blinkbreak
 {
 
@@ -89,8 +87,14 @@ public:
   /// @brief Handles the reset action.
   void OnReset();
 
-  /// @brief Opens the settings dialog.
+  /// @brief Switches the main window to the settings tab.
   void OnOpenSettings();
+
+  /// @brief Saves settings from the embedded settings tab.
+  void OnSaveSettings();
+
+  /// @brief Populates the embedded settings tab from the current config.
+  void PopulateSettingsTab();
 
   /// @brief Handles quit action from tray menu.
   void OnQuit();
@@ -176,9 +180,6 @@ private:
   /// @brief Applies the configured theme to the main window.
   void ApplyThemeToMainWindow();
 
-  /// @brief Applies the configured theme to the settings dialog.
-  void ApplyThemeToSettingsDialog();
-
   /// @brief Resolves the current live DND state and suppression policy.
   /// @param respect_dnd Whether actual DND/Focus states should be respected.
   /// @param respect_fullscreen Whether fullscreen/presentation states should be respected.
@@ -205,8 +206,6 @@ private:
 
   std::unique_ptr<slint::ComponentHandle<MainWindow>> main_window_;
   std::unique_ptr<slint::ComponentWeakHandle<MainWindow>> main_window_weak_;
-  std::unique_ptr<slint::ComponentHandle<SettingsDialog>> settings_dialog_;
-
   std::thread timer_thread_;
   std::atomic<bool> running_;
   mutable std::mutex mutex_;
@@ -238,6 +237,7 @@ private:
   std::string idle_time_;
   bool reset_short_on_idle_triggered_;  ///< Tracks if short reset on idle was triggered.
   bool reset_long_on_idle_triggered_;   ///< Tracks if long reset on idle was triggered.
+  bool suppress_settings_events_;
 };
 
 }  // namespace blinkbreak

@@ -10,6 +10,7 @@ import {
 } from "std-widgets.slint";
 
 import { SettingsView } from "components/settings_dialog.slint";
+import { Fonts } from "components/typography.slint";
 
 component TimerDisplay inherits Rectangle {
     in property <int> short_break_count: 0;
@@ -19,8 +20,8 @@ component TimerDisplay inherits Rectangle {
     in property <int> short_idle_skipped_count: 0;
     in property <int> long_idle_skipped_count: 0;
     in property <string> tracked_time: "00:00";
-    width: 160px;
-    height: 160px;
+    width: 220px;
+    height: 220px;
     border-radius: self.width / 2;
     background: Palette.alternate-background;
     border-width: 2px;
@@ -31,17 +32,29 @@ component TimerDisplay inherits Rectangle {
         spacing: 2px;
 
         Text {
+            text: "Time tracked";
+            font-size: Fonts.small;
+            font-weight: Fonts.small-weight;
+            horizontal-alignment: center;
+            color: Palette.foreground;
+        }
+
+        Text {
             text: root.tracked_time;
-            font-size: 20px;
-            font-weight: 700;
+            font-size: Fonts.overlay-message;
+            font-weight: 800;
             horizontal-alignment: center;
             color: Palette.accent-background;
         }
 
+        Rectangle {
+            height: 6px;
+        }
+
         Text {
             text: "Breaks";
-            font-size: 12px;
-            font-weight: 600;
+            font-size: Fonts.header;
+            font-weight: Fonts.header-weight;
             horizontal-alignment: center;
             color: Palette.foreground;
         }
@@ -52,16 +65,16 @@ component TimerDisplay inherits Rectangle {
 
             Text {
                 text: "Short: " + root.short_break_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
 
             Text {
                 text: "Long: " + root.long_break_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
@@ -69,8 +82,8 @@ component TimerDisplay inherits Rectangle {
 
         Text {
             text: "Skipped";
-            font-size: 11px;
-            font-weight: 600;
+            font-size: Fonts.header;
+            font-weight: Fonts.header-weight;
             horizontal-alignment: center;
             color: Palette.foreground;
         }
@@ -81,16 +94,16 @@ component TimerDisplay inherits Rectangle {
 
             Text {
                 text: "Short: " + root.short_skipped_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
 
             Text {
                 text: "Long: " + root.long_skipped_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
@@ -98,8 +111,8 @@ component TimerDisplay inherits Rectangle {
 
         Text {
             text: "Idle Skipped";
-            font-size: 11px;
-            font-weight: 600;
+            font-size: Fonts.header;
+            font-weight: Fonts.header-weight;
             horizontal-alignment: center;
             color: Palette.foreground;
         }
@@ -110,16 +123,16 @@ component TimerDisplay inherits Rectangle {
 
             Text {
                 text: "Short: " + root.short_idle_skipped_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
 
             Text {
                 text: "Long: " + root.long_idle_skipped_count;
-                font-size: 10px;
-                font-weight: 500;
+                font-size: Fonts.small;
+                font-weight: Fonts.small-weight;
                 horizontal-alignment: center;
                 color: Palette.foreground;
             }
@@ -239,7 +252,8 @@ export component MainWindow inherits Window {
 
                 Text {
                     text: root.status-text;
-                    font-size: 14px;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
@@ -264,7 +278,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Short break in: " + root.time-until-short;
-                        font-size: 10px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                         horizontal-alignment: left;
                     }
@@ -277,7 +291,7 @@ export component MainWindow inherits Window {
 
                     Text {
                         text: "Long break in: " + root.time-until-long;
-                        font-size: 10px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                         horizontal-alignment: left;
                     }
@@ -290,7 +304,7 @@ export component MainWindow inherits Window {
 
                     if (root.show-idle-timer): Text {
                         text: "Idle time: " + root.idle-time;
-                        font-size: 10px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                         horizontal-alignment: left;
                     }
@@ -366,61 +380,61 @@ export component MainWindow inherits Window {
 
                 Text {
                     text: "BlinkBreak";
-                    font-size: 24px;
-                    font-weight: 700;
+                    font-size: Fonts.title;
+                    font-weight: Fonts.title-weight;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
                 Text {
                     text: "Version 0.1.0";
-                    font-size: 14px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
                 Text {
                     text: "2026";
-                    font-size: 12px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
                 Text {
                     text: "Author: @nurgalive";
-                    font-size: 14px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
                 Text {
                     text: "GitHub: github.com/nurgalive";
-                    font-size: 14px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.accent-background;
                 }
 
                 Text {
                     text: "Questions and issues: blinkbreak@nurgalive.com";
-                    font-size: 13px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
                 Text {
                     text: "A desktop break companion for healthier screen habits.";
-                    font-size: 13px;
+                    font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
 
-                Text {
-                    text: "Features: break timers, idle awareness, notifications, multi-monitor overlays, and tray control.";
-                    font-size: 12px;
-                    wrap: word-wrap;
-                    horizontal-alignment: center;
-                    color: Palette.foreground;
-                }
+                // Text {
+                //     text: "Features: break timers, idle awareness, notifications, multi-monitor overlays, and tray control.";
+                //     font-size: Fonts.body;
+                //     wrap: word-wrap;
+                //     horizontal-alignment: center;
+                //     color: Palette.foreground;
+                // }
             }
         }
     }

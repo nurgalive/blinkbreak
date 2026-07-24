@@ -1,0 +1,30 @@
+// Shared typography constants for BlinkBreak UI.
+// Import with: import { Fonts } from "components/typography.slint";
+
+export global Fonts {
+    // Hero / primary display (timer, overlay countdown)
+    in-out property <length> hero: 20px;
+
+    // Section headers (Breaks, Skipped, Idle Skipped, Settings sections)
+    in-out property <length> header: 14px;
+    in-out property <int> header-weight: 600;
+
+    // Body / default text (labels, descriptions, About tab body)
+    in-out property <length> body: 12px;
+    in-out property <int> body-weight: 400;
+
+    // Small metadata (counts, status line)
+    in-out property <length> small: 12px;
+    in-out property <int> small-weight: 500;
+
+    // Large titles (About app name)
+    in-out property <length> title: 18px;
+    in-out property <int> title-weight: 700;
+
+    // Overlay-specific sizes
+    in-out property <length> overlay-type: 18px;
+    in-out property <length> overlay-message: 32px;
+    in-out property <length> overlay-countdown: 72px;
+    in-out property <length> overlay-button: 18px;
+    in-out property <int> overlay-button-weight: 600;
+}

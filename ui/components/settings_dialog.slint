@@ -9,6 +9,8 @@ import {
     Switch,
 } from "std-widgets.slint";
 
+import { Fonts } from "typography.slint";
+
 component NumberFieldRow inherits Rectangle {
     in property <string> label: "";
     in property <string> unit: "";
@@ -32,7 +34,7 @@ component NumberFieldRow inherits Rectangle {
                 text: root.label;
                 width: 280px;
                 vertical-alignment: center;
-                font-size: 12px;
+                font-size: Fonts.body;
                 color: Palette.foreground;
             }
 
@@ -44,14 +46,14 @@ component NumberFieldRow inherits Rectangle {
             Text {
                 text: root.unit;
                 vertical-alignment: center;
-                font-size: 12px;
+                font-size: Fonts.body;
                 color: Palette.foreground;
             }
         }
 
         if root.error != "": Text {
             text: root.error;
-            font-size: 12px;
+            font-size: Fonts.body;
             color: #d32f2f;
         }
     }
@@ -115,8 +117,8 @@ export component SettingsView inherits Rectangle {
 
         Text {
             text: "Settings";
-            font-size: 18px;
-            font-weight: 600;
+            font-size: Fonts.title;
+            font-weight: Fonts.title-weight;
             color: Palette.foreground;
         }
 
@@ -126,8 +128,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Short Break";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -147,8 +149,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Long Break";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -168,8 +170,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Overlay";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -188,7 +190,7 @@ export component SettingsView inherits Rectangle {
                         text: "Display on all monitors";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -205,7 +207,7 @@ export component SettingsView inherits Rectangle {
                         text: "Opaque overlay";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -216,8 +218,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Theme";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -229,7 +231,7 @@ export component SettingsView inherits Rectangle {
                         text: "Follow system theme";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -246,7 +248,7 @@ export component SettingsView inherits Rectangle {
                         text: "Dark theme";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -258,8 +260,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Notifications";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -271,7 +273,7 @@ export component SettingsView inherits Rectangle {
                         text: "Enable notifications";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -295,7 +297,7 @@ export component SettingsView inherits Rectangle {
                         text: "Respect DND";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -312,7 +314,7 @@ export component SettingsView inherits Rectangle {
                         text: "Respect full-screen apps";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -323,8 +325,8 @@ export component SettingsView inherits Rectangle {
 
                 Text {
                     text: "Idle Detection";
-                    font-size: 14px;
-                    font-weight: 600;
+                    font-size: Fonts.header;
+                    font-weight: Fonts.header-weight;
                     color: Palette.foreground;
                 }
 
@@ -336,7 +338,7 @@ export component SettingsView inherits Rectangle {
                         text: "Enable idle detection";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -360,7 +362,7 @@ export component SettingsView inherits Rectangle {
                         text: "Pause on idle";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -377,7 +379,7 @@ export component SettingsView inherits Rectangle {
                         text: "Show idle timer";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -394,7 +396,7 @@ export component SettingsView inherits Rectangle {
                         text: "Reset short break on idle";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -418,7 +420,7 @@ export component SettingsView inherits Rectangle {
                         text: "Reset long break on idle";
                         width: 280px;
                         vertical-alignment: center;
-                        font-size: 12px;
+                        font-size: Fonts.body;
                         color: Palette.foreground;
                     }
 
@@ -436,7 +438,7 @@ export component SettingsView inherits Rectangle {
 
                 if root.validation-error != "": Text {
                     text: root.validation-error;
-                    font-size: 12px;
+                    font-size: Fonts.body;
                     color: #d32f2f;
                 }
             }

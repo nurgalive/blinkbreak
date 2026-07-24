@@ -1,6 +1,7 @@
 // Break overlay window
 
 import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Fonts } from "components/typography.slint";
 
 component OverlayActionButton inherits Rectangle {
     in property <string> label: "";
@@ -16,8 +17,8 @@ component OverlayActionButton inherits Rectangle {
     Text {
         text: root.label;
         color: white;
-        font-size: 18px;
-        font-weight: 600;
+        font-size: Fonts.overlay-button;
+        font-weight: Fonts.overlay-button-weight;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -57,7 +58,7 @@ export component BreakOverlay inherits Window {
             // Break type indicator
             Text {
                 text: root.break-type + " Break";
-                font-size: 18px;
+                font-size: Fonts.overlay-type;
                 color: white.with-alpha(0.7);
                 horizontal-alignment: center;
             }
@@ -65,8 +66,8 @@ export component BreakOverlay inherits Window {
             // Main message
             Text {
                 text: root.message;
-                font-size: 32px;
-                font-weight: 600;
+                font-size: Fonts.overlay-message;
+                font-weight: Fonts.overlay-button-weight;
                 color: white;
                 horizontal-alignment: center;
             }
@@ -79,8 +80,8 @@ export component BreakOverlay inherits Window {
             // Time remaining
             Text {
                 text: root.time-remaining;
-                font-size: 72px;
-                font-weight: 700;
+                font-size: Fonts.overlay-countdown;
+                font-weight: Fonts.title-weight;
                 color: white;
                 horizontal-alignment: center;
             }

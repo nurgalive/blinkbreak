@@ -379,7 +379,7 @@ export component MainWindow inherits Window {
                 spacing: 14px;
 
                 Text {
-                    text: "BlinkBreak";
+                    text: "BlinkBreak for Windows";
                     font-size: Fonts.title;
                     font-weight: Fonts.title-weight;
                     horizontal-alignment: center;
@@ -387,36 +387,9 @@ export component MainWindow inherits Window {
                 }
 
                 Text {
-                    text: "Version 0.1.0";
+                    text: "Made with ❤️ by nurgalive";
                     font-size: Fonts.body;
-                    horizontal-alignment: center;
-                    color: Palette.foreground;
-                }
-
-                Text {
-                    text: "2026";
-                    font-size: Fonts.body;
-                    horizontal-alignment: center;
-                    color: Palette.foreground;
-                }
-
-                Text {
-                    text: "Author: @nurgalive";
-                    font-size: Fonts.body;
-                    horizontal-alignment: center;
-                    color: Palette.foreground;
-                }
-
-                Text {
-                    text: "GitHub: github.com/nurgalive";
-                    font-size: Fonts.body;
-                    horizontal-alignment: center;
-                    color: Palette.accent-background;
-                }
-
-                Text {
-                    text: "Questions and issues: blinkbreak@nurgalive.com";
-                    font-size: Fonts.body;
+                    font-weight: Fonts.title-weight;
                     horizontal-alignment: center;
                     color: Palette.foreground;
                 }
@@ -426,6 +399,46 @@ export component MainWindow inherits Window {
                     font-size: Fonts.body;
                     horizontal-alignment: center;
                     color: Palette.foreground;
+                }
+
+                TextInput {
+                    text: "Version 0.1.0";
+                    font-size: Fonts.body;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                    read-only: true;
+                }
+
+                TextInput {
+                    text: "Build date 2026";
+                    font-size: Fonts.body;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                    read-only: true;
+                }
+
+                TextInput {
+                    text: "Commit 2026";
+                    font-size: Fonts.body;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                    read-only: true;
+                }
+
+                TextInput {
+                    text: "Source code: https://github.com/nurgalive/blinkbreak";
+                    font-size: Fonts.body;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                    read-only: true;
+                }
+
+                TextInput {
+                    text: "Questions and issues: blinkbreak@nurgalive.com";
+                    font-size: Fonts.body;
+                    horizontal-alignment: center;
+                    color: Palette.foreground;
+                    read-only: true;
                 }
 
                 // Text {

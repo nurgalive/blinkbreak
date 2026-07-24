@@ -231,6 +231,10 @@ build/debug/src/Debug/blinkbreak.exe
 
 # With version flag
 build/debug/src/Debug/blinkbreak.exe --version
+
+# Release version
+\build\release\src\Release\blinkbreak.exe
+
 ```
 
 ## Project Structure

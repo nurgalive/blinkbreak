@@ -27,7 +27,14 @@ int main(int argc, char* argv[])
 #ifdef _WIN32
   if (std::getenv("SLINT_BACKEND") == nullptr)
   {
-    _putenv_s("SLINT_BACKEND", "winit-femtovg-wgpu");
+    // options:
+    // winit-skia - portrait issues
+    // winit-skia-opengl - portrait issues
+    // winit-skia-software - portrait issues
+    // winit-femtovg - portrait issues
+    // winit-femtovg-wgpu - does not have transparent window issues. But issues with portrait screen.
+    // winit-software - no portrait issues, but transparent windows
+    _putenv_s("SLINT_BACKEND", "winit-software");
     // _putenv_s("SLINT_BACKEND", "winit-software");  // this backend produces the rendering
     // issues
   }

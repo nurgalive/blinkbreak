@@ -111,5 +111,19 @@ TEST(MainWindowUiTest, ThemePropertiesRoundTrip)
   EXPECT_FALSE(window->get_dark_theme_enabled());
 }
 
+/// @test Verifies the About tab logo image is loaded.
+/// @details Confirms `about-logo` resolves to a non-empty image so the SVG
+/// resource is embedded and decodable.
+TEST(MainWindowUiTest, AboutLogoImageIsLoaded)
+{
+  auto window = MainWindow::create();
+
+  const auto logo = window->get_about_logo();
+  const auto size = logo.size();
+
+  EXPECT_GT(size.width, 0);
+  EXPECT_GT(size.height, 0);
+}
+
 }  // namespace
 }  // namespace blinkbreak::ui_test

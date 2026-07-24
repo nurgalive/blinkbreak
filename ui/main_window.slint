@@ -143,6 +143,7 @@ component TimerDisplay inherits Rectangle {
 export component MainWindow inherits Window {
     title: "BlinkBreak";
     icon: @image-url("../resources/bb_logo_blue.ico");
+    out property <image> about-logo: @image-url("../resources/bb_logo_notext.svg");
     min-width: 520px;
     min-height: 520px;
     preferred-width: 560px;
@@ -377,6 +378,16 @@ export component MainWindow inherits Window {
                 alignment: center;
                 padding: 24px;
                 spacing: 14px;
+
+                HorizontalLayout {
+                    alignment: center;
+
+                    Image {
+                        source: root.about-logo;
+                        width: 120px;
+                        image-fit: contain;
+                    }
+                }
 
                 Text {
                     text: "BlinkBreak for Windows";
